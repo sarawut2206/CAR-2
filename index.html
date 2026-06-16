@@ -318,6 +318,19 @@
   .result-icon { font-size: 48px; margin-bottom: 8px; }
   .result-title { font-size: 18px; font-weight: 700; color: var(--success); margin-bottom: 4px; }
   .result-detail { font-size: 14px; color: #166534; }
+  .pending-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--warning-bg);
+    border: 1.5px solid #fcd34d;
+    color: var(--warning);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    margin-top: 12px;
+  }
 
   /* ===== SETUP PANEL ===== */
   .setup-panel {
@@ -473,7 +486,6 @@
   <div class="tabs">
     <button class="tab active" onclick="switchTab('book')">🚌 จองรถ</button>
     <button class="tab" onclick="switchTab('status')">📊 สถานะรถ</button>
-    <button class="tab" onclick="switchTab('check')">🔍 ตรวจสอบ</button>
     <button class="tab" onclick="switchTab('admin')">🔐 ผู้ดูแล</button>
   </div>
 
@@ -576,19 +588,6 @@
     </div>
   </div>
 
-  <!-- ===== TAB: CHECK ===== -->
-  <div id="tab-check" class="tab-content">
-    <div class="section-title">🔍 ตรวจสอบการจองของตนเอง</div>
-    <div class="form-card">
-      <div class="form-row">
-        <label>เลขประจำตัว นศท.</label>
-        <input type="text" id="checkId" placeholder="กรอกเลขประจำตัว นศท." />
-      </div>
-      <button class="btn-primary" onclick="checkBooking()">ตรวจสอบ</button>
-    </div>
-    <div id="checkResult"></div>
-  </div>
-
   <!-- ===== TAB: ADMIN ===== -->
   <div id="tab-admin" class="tab-content">
     <div class="section-title">🔐 ผู้ดูแลระบบ</div>
@@ -669,7 +668,7 @@
 const STUDENT_DB = [{"id": "1683328965", "name": "กนกพล แก้วทองเมือง", "gender": "ชาย"}, {"id": "1683328966", "name": "กรวิชญ์ บุญทา", "gender": "ชาย"}, {"id": "1683328967", "name": "กฤตวัฒน์ กองสิงห์", "gender": "ชาย"}, {"id": "1683312088", "name": "กฤติเดช ทองสุภารักคณาภา", "gender": "ชาย"}, {"id": "1683328968", "name": "กฤษณะพัฒน์ ตันสงวน", "gender": "ชาย"}, {"id": "1683328969", "name": "กฤษตรีเทพ ทองอร่าม", "gender": "ชาย"}, {"id": "1683328970", "name": "กวิน คำผา", "gender": "ชาย"}, {"id": "1683312089", "name": "กิตติเชษฐ์ มนต์พรพรรษ", "gender": "ชาย"}, {"id": "1683312090", "name": "คณิน เขตชัยภูมิ", "gender": "ชาย"}, {"id": "1683312091", "name": "จักรธร จันทร์น้อย", "gender": "ชาย"}, {"id": "1683328972", "name": "จิตติพัฒน์ จันทร์มี", "gender": "ชาย"}, {"id": "1683312092", "name": "ฉัตรดนัย เปรมอมรกิจ", "gender": "ชาย"}, {"id": "1683328973", "name": "ฉัตรบดินทร์ ปานดี", "gender": "ชาย"}, {"id": "1683328974", "name": "ชนธัญ ศรีเจิมทอง", "gender": "ชาย"}, {"id": "1683328975", "name": "ชนะกฤช กลอยสวาท", "gender": "ชาย"}, {"id": "1683328976", "name": "ชยากร งามถาวรวงศ์", "gender": "ชาย"}, {"id": "1683312093", "name": "ชยากร พจนาภิรักษ์", "gender": "ชาย"}, {"id": "1683328977", "name": "ชินดนัย เดชะมี", "gender": "ชาย"}, {"id": "1683328981", "name": "ณฐกร พูนนุช", "gender": "ชาย"}, {"id": "1683312094", "name": "ณัฏฐกรณ์ ภูนุช", "gender": "ชาย"}, {"id": "1683312095", "name": "ณัฏฐ์พีรยช อิทธิสัญญากร", "gender": "ชาย"}, {"id": "1683312096", "name": "ณัฐกานต์ คชงาม", "gender": "ชาย"}, {"id": "1683328982", "name": "ณัฐกิตติ์ ธนโชติธิติพงศ์", "gender": "ชาย"}, {"id": "1683312097", "name": "ณัฐชนน ผ่องพันธุ์", "gender": "ชาย"}, {"id": "1683328983", "name": "ณัฐนนท์ เต้นรัมย์", "gender": "ชาย"}, {"id": "1683328984", "name": "ณัฐพล กันบัว", "gender": "ชาย"}, {"id": "1683328985", "name": "ณัฐพัชร์ ภักดี", "gender": "ชาย"}, {"id": "1683328986", "name": "ณัฐพัทร ทองสิมา", "gender": "ชาย"}, {"id": "1683328987", "name": "ณิธิพงษ์ ซุ้มชัยวงศ์", "gender": "ชาย"}, {"id": "1683312149", "name": "ถิรวัฒน์ วังคะฮาด", "gender": "ชาย"}, {"id": "1683312150", "name": "ถิรายุ ไชยเกตุ", "gender": "ชาย"}, {"id": "1683312151", "name": "ทรัพย์สิน ศรีศิลปอุดม", "gender": "ชาย"}, {"id": "1683312152", "name": "ทศพร กระแสโท", "gender": "ชาย"}, {"id": "1683312153", "name": "ทิพากร ลำพุทธา", "gender": "ชาย"}, {"id": "1683312154", "name": "ธนกร โจยะกุลเจริญ", "gender": "ชาย"}, {"id": "1683328988", "name": "ธนกร โพธิ์ประพันธ์", "gender": "ชาย"}, {"id": "1683312155", "name": "ธนกฤต เตชะศุภสิน", "gender": "ชาย"}, {"id": "1683328989", "name": "ธนชาต นาแหยม", "gender": "ชาย"}, {"id": "1683312156", "name": "ธนนนท์ คชเดช", "gender": "ชาย"}, {"id": "1683312157", "name": "ธนพนธ์ อาจทวีกุล", "gender": "ชาย"}, {"id": "1683312158", "name": "ธนพล พลหาญ", "gender": "ชาย"}, {"id": "1683328940", "name": "ธนภูมิ ลาภสุนทร", "gender": "ชาย"}, {"id": "1683328941", "name": "ธนะเทพ ชีพชูชัย", "gender": "ชาย"}, {"id": "1683328942", "name": "ธนา พิบูลธรรมนนท์", "gender": "ชาย"}, {"id": "1683328943", "name": "ธรดล กิ่งสวัสดิ์", "gender": "ชาย"}, {"id": "1683312160", "name": "ธรานนท์ นาประทุม", "gender": "ชาย"}, {"id": "1683312159", "name": "ธราเทพ พวงกิจจา", "gender": "ชาย"}, {"id": "1683328944", "name": "ธัญเทพ จันทร์ธรรม", "gender": "ชาย"}, {"id": "1683312161", "name": "ธิติกร สีดำ", "gender": "ชาย"}, {"id": "1683328945", "name": "ธีรภัทร์ ทวีก้านตง", "gender": "ชาย"}, {"id": "1683328946", "name": "นนทชา วงษ์ปาน", "gender": "ชาย"}, {"id": "1683328947", "name": "นนทนพงศ์ กุลปภาวิณ", "gender": "ชาย"}, {"id": "1683312036", "name": "นพคุณ เรืองเชื้อเหมือน", "gender": "ชาย"}, {"id": "1683312037", "name": "นพรัตน์ พันธ์หารี", "gender": "ชาย"}, {"id": "1683312038", "name": "นพรุจ วรัญญูวัฒนะ", "gender": "ชาย"}, {"id": "1683328948", "name": "นพรุจน์ อินทร์ประดับ", "gender": "ชาย"}, {"id": "1683312039", "name": "นรานนท์ เลิศหัตถพงศ์", "gender": "ชาย"}, {"id": "1683312040", "name": "นัทนัน บุญสนธิ", "gender": "ชาย"}, {"id": "1683312041", "name": "นิชคุณ นิ่มทองคำ", "gender": "ชาย"}, {"id": "1683328949", "name": "นิติภูมิ ธนสีลังกูร", "gender": "ชาย"}, {"id": "1683328950", "name": "บุณกรินทร์ เกาะกลาง", "gender": "ชาย"}, {"id": "1683312042", "name": "บุณยพัฒน์ ทิพย์ประภาพร", "gender": "ชาย"}, {"id": "1683312043", "name": "บุณยฤทธิ์ แตงสมุทร", "gender": "ชาย"}, {"id": "1683328951", "name": "ปฏิภาณ จุ้ยทอง", "gender": "ชาย"}, {"id": "1683312045", "name": "ปรมะ เกตุโกศล", "gender": "ชาย"}, {"id": "1683328952", "name": "ปรมัทถ วงศาจันทร์", "gender": "ชาย"}, {"id": "1683312046", "name": "ปรัญชัย วรเลิศชัยฤทธิ์", "gender": "ชาย"}, {"id": "1683328953", "name": "ปริญญวัฒน์ ไชยวัฒน์เธียรกุล", "gender": "ชาย"}, {"id": "1683312047", "name": "ปริทัต โกสูงเนิน", "gender": "ชาย"}, {"id": "1683312048", "name": "ปรินทร์ บัวพา", "gender": "ชาย"}, {"id": "1683328954", "name": "ปิยะพงษ์ วรพันธ์", "gender": "ชาย"}, {"id": "1683312044", "name": "ปเมธินท์ แย้มนุ่น", "gender": "ชาย"}, {"id": "1683312009", "name": "พงศกร ฝาพิมาย", "gender": "ชาย"}, {"id": "1683328955", "name": "พรเทพ วรรณวรเศรษฐ", "gender": "ชาย"}, {"id": "1683312010", "name": "พศุตม์ เต็มใจรัก", "gender": "ชาย"}, {"id": "1683328956", "name": "พิชญะ โฮ่ทองคำ", "gender": "ชาย"}, {"id": "1683312011", "name": "พิชยะ คุ้มอักษร", "gender": "ชาย"}, {"id": "1683312012", "name": "พีรพัฒน์ ปานเกษม", "gender": "ชาย"}, {"id": "1683312013", "name": "พีรพัฒน์ หนูเสน", "gender": "ชาย"}, {"id": "1683328957", "name": "พุฒิพัชร ฟองสาลี", "gender": "ชาย"}, {"id": "1683328960", "name": "ภัทรพล เลี้ยงพรม", "gender": "ชาย"}, {"id": "1683328961", "name": "ภัทรวัฒน์ รักงาม", "gender": "ชาย"}, {"id": "1683328958", "name": "ภัทร์นรินท์ ชัยเดชาภินันท์", "gender": "ชาย"}, {"id": "1683328959", "name": "ภัทร์พงศ์ อุดมพรวิรัตน์", "gender": "ชาย"}, {"id": "1683312014", "name": "ภาณุวัฒน์ พานเพ็ง", "gender": "ชาย"}, {"id": "1683328962", "name": "ภานุพงษ์ สุวรรณนัง", "gender": "ชาย"}, {"id": "1683328963", "name": "ภาวัต เศรษฐบุตร", "gender": "ชาย"}, {"id": "1683312015", "name": "ภูริณัฐ อ่อนศรี", "gender": "ชาย"}, {"id": "1683312077", "name": "วทัญญู ศิริสวัสดิ์", "gender": "ชาย"}, {"id": "1683312078", "name": "วรภัทร ชูทอง", "gender": "ชาย"}, {"id": "1683312079", "name": "วรวัตร หุตจิตต์", "gender": "ชาย"}, {"id": "1683328964", "name": "วรวิช บัวเพชร", "gender": "ชาย"}, {"id": "1683329139", "name": "วสิษฐ์พล รอดพันธุ์", "gender": "ชาย"}, {"id": "1683329140", "name": "วัชรินทร์ แย้มสายหยุด", "gender": "ชาย"}, {"id": "1683312080", "name": "วิชัยยุทธ อยู่มงคล", "gender": "ชาย"}, {"id": "1683312081", "name": "ศักรินทร์ ล้อมเล็ก", "gender": "ชาย"}, {"id": "1683329141", "name": "ศิรวิชญ์ สายสว่าง", "gender": "ชาย"}, {"id": "1683329143", "name": "ศุภกร สุดพูล", "gender": "ชาย"}, {"id": "1683329142", "name": "ศุภกร เรืองโรจน์", "gender": "ชาย"}, {"id": "1683312082", "name": "ศุภณัฐ งามสี", "gender": "ชาย"}, {"id": "1683312083", "name": "ศุภณัฐ สังเรือง", "gender": "ชาย"}, {"id": "1683312084", "name": "ศุภณัฐ สุภกรรม", "gender": "ชาย"}, {"id": "1683329144", "name": "ศุภวิชญ์ กลยาณีย์", "gender": "ชาย"}, {"id": "1683312085", "name": "สถิตคุณ สอาดใจ", "gender": "ชาย"}, {"id": "1683312086", "name": "สรยุทธ แสนสุรีย์", "gender": "ชาย"}, {"id": "1683312087", "name": "สรวิชญ์ ใจดี", "gender": "ชาย"}, {"id": "1683329145", "name": "สิรวิชญ์ บุญเอื้อ", "gender": "ชาย"}, {"id": "1683312049", "name": "สิริชัย ไทยน้อย", "gender": "ชาย"}, {"id": "1683312050", "name": "สิริเชษฐ์ สังข์วิสิทธิ์", "gender": "ชาย"}, {"id": "1683312051", "name": "สุกฤต ชินวงศ์", "gender": "ชาย"}, {"id": "1683312052", "name": "สุขสรรค์ พลรักษา", "gender": "ชาย"}, {"id": "1683329146", "name": "สุทธิรักษ์ เกิดเพิ่ม", "gender": "ชาย"}, {"id": "1683329147", "name": "สุภนัย แซ่ฮึง", "gender": "ชาย"}, {"id": "1683312053", "name": "อนาวิน ภูทองเป้ง", "gender": "ชาย"}, {"id": "1683329148", "name": "อรรถพล เที่ยงแท้", "gender": "ชาย"}, {"id": "1683329149", "name": "อัศนัย โสนะจิตร", "gender": "ชาย"}, {"id": "1683329150", "name": "อัศวกรณ์ มิลินเบญญาทัศน์", "gender": "ชาย"}, {"id": "1683329151", "name": "อาชวิน เพ็งหมัด", "gender": "ชาย"}, {"id": "1683312054", "name": "อาทิตย์ ไชยปัญญา", "gender": "ชาย"}, {"id": "1683329152", "name": "อานนท์ แทนไทยสงค์", "gender": "ชาย"}, {"id": "1683329153", "name": "อิชย์ ศรีจรูญ", "gender": "ชาย"}, {"id": "1683314307", "name": "อินเตอร์ หัสคำ", "gender": "ชาย"}, {"id": "1683328971", "name": "เกียรติกมล อุตะมะ", "gender": "ชาย"}, {"id": "1683312098", "name": "เตชิต จันทร์พินิจ", "gender": "ชาย"}, {"id": "1683312016", "name": "เมธาวิน เรือนนาค", "gender": "ชาย"}, {"id": "1683329154", "name": "เอลีชา ขินทอง", "gender": "ชาย"}, {"id": "1683328979", "name": "ไชยกร ขำโยม", "gender": "ชาย"}, {"id": "1683328980", "name": "ไชยวัฒน์ พงษ์นาค", "gender": "ชาย"}, {"id": "0683328900", "name": "กรชนก กระจ่างศรี", "gender": "หญิง"}, {"id": "0683328901", "name": "กวิสรา ภูมิลำเนา", "gender": "หญิง"}, {"id": "0683316686", "name": "กิตติยาพร เนาวบุตร", "gender": "หญิง"}, {"id": "0683316687", "name": "ชณพรรณ โดรินทร์", "gender": "หญิง"}, {"id": "0683328902", "name": "ญาราภรณ์ วงค์ขันธ์", "gender": "หญิง"}, {"id": "0683316688", "name": "ณัชชา ดำริพัฒนสกุล", "gender": "หญิง"}, {"id": "0683316689", "name": "ณัฐฐานันท์ ทิพย์จ้อย", "gender": "หญิง"}, {"id": "0683316690", "name": "ธนพร ปานยิ้ม", "gender": "หญิง"}, {"id": "0683316692", "name": "ปสุตา ฑัตตะวร", "gender": "หญิง"}, {"id": "0683328903", "name": "ปาณิตา ศรีแกล้ว", "gender": "หญิง"}, {"id": "0683328904", "name": "ปุญญวี เจริญคุณ", "gender": "หญิง"}, {"id": "0683316693", "name": "พลอยนพเก้า รุ่งเรือง", "gender": "หญิง"}, {"id": "0683316694", "name": "พิมพ์ณดา พงศ์ธรรมภักดิ์", "gender": "หญิง"}, {"id": "0683316912", "name": "ภคกนกพร ทวีโชติธนัท", "gender": "หญิง"}, {"id": "0683328905", "name": "ภคพร ยิ่งรักษา", "gender": "หญิง"}, {"id": "0683316695", "name": "รินรดา วิวัฒนาวรารมย์", "gender": "หญิง"}, {"id": "0683316696", "name": "วรกันยา สุจริต", "gender": "หญิง"}, {"id": "0683316697", "name": "ศศิกาญจน์ แก้วนิพนธ์", "gender": "หญิง"}, {"id": "0683316698", "name": "ศศิกานต์ สิงห์คลี", "gender": "หญิง"}, {"id": "0683316699", "name": "ศศิธร หลวงสมบัติ", "gender": "หญิง"}, {"id": "0683328906", "name": "ศุภาพิชญ์ ล้อมเวียง", "gender": "หญิง"}, {"id": "0683316659", "name": "อินทิรา พางกะสา", "gender": "หญิง"}, {"id": "0683316691", "name": "เบญญาภา สิโตทัย", "gender": "หญิง"}, {"id": "1681930393", "name": "นฤเบศร์ เกิดผล", "gender": "ชาย"}, {"id": "1686000329", "name": "รพีภัทร อ่อนทองหลาง", "gender": "ชาย"}, {"id": "1681901452", "name": "วัชรากร คล่องแคล่ว", "gender": "ชาย"}];
 const MAX_PER_BUS = 23;
 const TOTAL_BUSES = 7;
-const ADMIN_PASSWORD = 'SAM2206'; // เปลี่ยนรหัสได้ที่นี่
+const ADMIN_PASSWORD = 'teacher2569'; // เปลี่ยนรหัสได้ที่นี่
 const BUS_COLORS = {
   1: '#dc2626', 2: '#1d4ed8', 3: '#15803d',
   4: '#ca8a04', 5: '#7c3aed', 6: '#ea580c', 7: '#db2777'
@@ -895,10 +894,11 @@ async function confirmBooking() {
 
     if (data.success) {
       const rc = document.getElementById('resultCard');
-      document.getElementById('resultTitle').textContent = 'จองรถสำเร็จ! 🎉';
+      document.getElementById('resultTitle').textContent = 'บันทึกการจองแล้ว ✅';
       document.getElementById('resultDetail').innerHTML =
         `${pendingBooking.stdName} · รถคันที่ ${pendingBooking.busNum} (${BUS_LABELS[pendingBooking.busNum]})<br>
-         ที่นั่งที่ ${data.seatNum} / ${MAX_PER_BUS} · จำนวนเงิน 945 บาท`;
+         ที่นั่งที่ ${data.seatNum} / ${MAX_PER_BUS} · จำนวนเงิน 945 บาท
+         <div class="pending-badge">⏳ รอการตรวจสอบ/อนุมัติ หลังจากชำระเงิน 945 บาท เท่านั้น</div>`;
       rc.style.display = 'block';
       rc.scrollIntoView({ behavior: 'smooth' });
       loadBusStatus();
@@ -944,40 +944,6 @@ function renderStatusDetail(data) {
   document.getElementById('statusDetail').innerHTML = html;
 }
 
-// ===== CHECK BOOKING =====
-async function checkBooking() {
-  const id = document.getElementById('checkId').value.trim();
-  if (!id) { showSystemAlert('กรุณากรอกเลขประจำตัว นศท.', 'warning'); return; }
-  if (!SCRIPT_URL) { showSystemAlert('ยังไม่ได้ตั้งค่าระบบ', 'warning'); return; }
-
-  const res = document.getElementById('checkResult');
-  res.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)">กำลังตรวจสอบ...</div>';
-
-  try {
-    const r = await fetch(`${SCRIPT_URL}?action=check&stdId=${id}`);
-    const data = await r.json();
-    if (data.found) {
-      res.innerHTML = `
-        <div class="alert alert-success" style="margin-top:12px">
-          <span class="alert-icon">✅</span>
-          <div>
-            <strong>${data.name}</strong> · เลข ${id}<br>
-            จองรถคันที่ <strong>${data.busNum}</strong> (${BUS_LABELS[data.busNum]})<br>
-            ที่นั่งที่ ${data.seatNum} · ${data.timestamp || ''}
-          </div>
-        </div>`;
-    } else {
-      res.innerHTML = `
-        <div class="alert alert-warning" style="margin-top:12px">
-          <span class="alert-icon">❓</span>
-          <div>ไม่พบข้อมูลการจองสำหรับเลข <strong>${id}</strong> กรุณาตรวจสอบเลข นศท. อีกครั้ง</div>
-        </div>`;
-    }
-  } catch(e) {
-    res.innerHTML = `<div class="alert alert-danger" style="margin-top:12px"><span>❌</span><div>เชื่อมต่อไม่ได้: ${e.message}</div></div>`;
-  }
-}
-
 // ===== ADMIN =====
 function adminLogin() {
   const pass = document.getElementById('adminPass').value;
@@ -1006,6 +972,7 @@ async function loadPassengers() {
               <div>
                 <div style="font-weight:600;font-size:13px">${p.name}</div>
                 <div style="font-size:12px;color:var(--text-muted)">${p.stdId} · ${p.timestamp || ''}</div>
+                <div style="font-size:11px;color:var(--warning);font-weight:600;margin-top:2px">⏳ รอตรวจสอบ/อนุมัติการชำระเงิน</div>
               </div>
             </div>`).join('')}
         </div>
@@ -1040,7 +1007,7 @@ async function cancelBooking() {
 // ===== TABS =====
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach((t, i) => {
-    t.classList.toggle('active', ['book','status','check','admin'][i] === name);
+    t.classList.toggle('active', ['book','status','admin'][i] === name);
   });
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
