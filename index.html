@@ -619,6 +619,15 @@
           </select>
         </div>
         <div id="passengerList"></div>
+        <div id="passengerExportRow" style="display:none; margin-top:10px; gap:8px;">
+          <button class="btn-secondary" style="width:100%; margin-bottom:8px;" onclick="printPassengerList()">🖨️ พิมพ์รายชื่อรถคันนี้</button>
+          <button class="btn-secondary" style="width:100%;" onclick="exportPassengerCSV()">📥 ส่งออก CSV รถคันนี้</button>
+        </div>
+      </div>
+      <div class="form-card">
+        <div class="section-title">ส่งออกรายชื่อทุกคัน</div>
+        <div class="form-hint" style="margin-bottom:10px">พิมพ์/ส่งออกรายชื่อผู้จองครบทั้ง 7 คันในครั้งเดียว สำหรับใช้แจกหน้ารถ</div>
+        <button class="btn-primary" onclick="printAllBuses()">🖨️ พิมพ์รายชื่อทุกคัน</button>
       </div>
       <div class="form-card">
         <div class="section-title">ยกเลิกการจอง</div>
@@ -956,13 +965,17 @@ function adminLogin() {
 
 async function loadPassengers() {
   const busNum = document.getElementById('adminBusSelect').value;
-  if (!busNum || !SCRIPT_URL) return;
+  const exportRow = document.getElementById('passengerExportRow');
+  if (!busNum || !SCRIPT_URL) { exportRow.style.display = 'none'; return; }
   const listEl = document.getElementById('passengerList');
   listEl.innerHTML = '<div style="padding:12px;color:var(--text-muted)">กำลังโหลด...</div>';
+  exportRow.style.display = 'none';
 
   try {
     const res = await fetch(`${SCRIPT_URL}?action=passengers&busNum=${busNum}`);
     const data = await res.json();
+    lastPassengerData = { busNum: parseInt(busNum), passengers: data.passengers || [] };
+
     if (data.passengers && data.passengers.length > 0) {
       listEl.innerHTML = `
         <div class="passenger-list">
@@ -977,12 +990,115 @@ async function loadPassengers() {
             </div>`).join('')}
         </div>
         <div style="margin-top:8px;font-size:13px;color:var(--text-muted)">รวม ${data.passengers.length} / ${MAX_PER_BUS} คน</div>`;
+      exportRow.style.display = 'block';
     } else {
       listEl.innerHTML = '<div style="padding:12px;color:var(--text-muted)">ยังไม่มีผู้จอง</div>';
     }
   } catch(e) {
     listEl.innerHTML = `<div style="padding:12px;color:var(--danger)">ข้อผิดพลาด: ${e.message}</div>`;
   }
+}
+
+// ===== EXPORT / PRINT PASSENGER LIST =====
+let lastPassengerData = null;
+
+function buildPassengerTableHTML(busNum, passengers, forPrint) {
+  const label = BUS_LABELS[busNum];
+  const gender = BUS_GENDER[busNum];
+  const color = BUS_COLORS[busNum];
+  const rows = passengers.map((p, i) => `
+    <tr>
+      <td style="text-align:center">${i+1}</td>
+      <td>${p.stdId}</td>
+      <td>${p.name}</td>
+      <td style="text-align:center">945</td>
+      <td style="text-align:center">☐</td>
+      <td></td>
+    </tr>`).join('');
+
+  return `
+    <div style="font-family:'Sarabun','Segoe UI',sans-serif; padding:${forPrint ? '24px' : '0'};">
+      <div style="text-align:center; margin-bottom:6px;">
+        <div style="font-size:16px; font-weight:700;">ระบบจองรถโดยสาร นศท. ชั้นปีที่ 2</div>
+        <div style="font-size:13px; color:#555;">โรงเรียนมัธยมวัดหนองแขม · ปีการศึกษา 2569</div>
+      </div>
+      <div style="text-align:center; margin:10px 0 16px;">
+        <span style="background:${color}; color:white; padding:6px 16px; border-radius:6px; font-size:15px; font-weight:700;">
+          รถคันที่ ${busNum} · ${label} · ${gender === 'หญิง' ? 'นศท.หญิง' : 'นศท.ชาย'}
+        </span>
+      </div>
+      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+        <thead>
+          <tr style="background:#eef0f5;">
+            <th style="border:1px solid #999; padding:6px;">ที่</th>
+            <th style="border:1px solid #999; padding:6px;">เลข นศท.</th>
+            <th style="border:1px solid #999; padding:6px;">ชื่อ-สกุล</th>
+            <th style="border:1px solid #999; padding:6px;">ค่ารถ (บาท)</th>
+            <th style="border:1px solid #999; padding:6px;">ชำระแล้ว</th>
+            <th style="border:1px solid #999; padding:6px;">ลงชื่อขึ้นรถ</th>
+          </tr>
+        </thead>
+        <tbody>${rows || `<tr><td colspan="6" style="text-align:center; padding:14px; border:1px solid #999;">ยังไม่มีผู้จอง</td></tr>`}</tbody>
+      </table>
+      <div style="margin-top:10px; font-size:13px;">รวมผู้จอง: <strong>${passengers.length}</strong> / ${MAX_PER_BUS} คน</div>
+      <div style="margin-top:30px; font-size:13px; display:flex; justify-content:space-between;">
+        <div>ผู้ตรวจสอบ/รับเงิน ........................................</div>
+        <div>วันที่ ........../........../..........</div>
+      </div>
+    </div>`;
+}
+
+function openPrintWindow(html) {
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>พิมพ์รายชื่อ</title>
+    <style>
+      @page { size: A4; margin: 14mm; }
+      body { margin:0; }
+      @media print { button { display:none; } }
+    </style></head><body>${html}
+    <div style="text-align:center; margin-top:20px;">
+      <button onclick="window.print()" style="padding:10px 24px; font-size:14px; cursor:pointer;">🖨️ พิมพ์</button>
+    </div>
+    </body></html>`);
+  w.document.close();
+}
+
+function printPassengerList() {
+  if (!lastPassengerData) return;
+  const html = buildPassengerTableHTML(lastPassengerData.busNum, lastPassengerData.passengers, true);
+  openPrintWindow(html);
+}
+
+function exportPassengerCSV() {
+  if (!lastPassengerData) return;
+  const { busNum, passengers } = lastPassengerData;
+  let csv = '\uFEFF' + ['ที่', 'เลข นศท.', 'ชื่อ-สกุล', 'รถคันที่', 'ประเภท', 'ค่ารถ', 'วันเวลาจอง'].join(',') + '\n';
+  passengers.forEach((p, i) => {
+    csv += [i+1, p.stdId, `"${p.name}"`, busNum, BUS_GENDER[busNum], 945, `"${p.timestamp || ''}"`].join(',') + '\n';
+  });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `รายชื่อจอง_คันที่${busNum}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function printAllBuses() {
+  if (!SCRIPT_URL) { showSystemAlert('ยังไม่ได้ตั้งค่าระบบ', 'warning'); return; }
+  let allHtml = '';
+  for (let i = 1; i <= TOTAL_BUSES; i++) {
+    try {
+      const res = await fetch(`${SCRIPT_URL}?action=passengers&busNum=${i}`);
+      const data = await res.json();
+      allHtml += buildPassengerTableHTML(i, data.passengers || [], true);
+      if (i < TOTAL_BUSES) allHtml += '<div style="page-break-after:always;"></div>';
+    } catch(e) {
+      allHtml += `<div style="padding:14px;color:red;">รถคันที่ ${i}: โหลดข้อมูลไม่สำเร็จ (${e.message})</div>`;
+    }
+  }
+  openPrintWindow(allHtml);
 }
 
 async function cancelBooking() {
