@@ -524,18 +524,20 @@
       <div class="section-title">📝 กรอกข้อมูลการจอง</div>
 
       <div class="form-row">
-        <label>เลขประจำตัว นศท. <span style="color:var(--danger)">*</span></label>
-        <input type="text" id="stdId" placeholder="เช่น 1683328965" maxlength="20"
-               oninput="lookupStudent(this.value)" autocomplete="off" />
-        <div class="form-hint">พิมพ์เลข นศท. แล้วชื่อจะขึ้นอัตโนมัติ</div>
-        <div id="searchResults" style="display:none; border:1.5px solid var(--border); border-radius:8px; max-height:180px; overflow-y:auto; background:white; margin-top:4px; box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
+        <label>เลือกชื่อ นศท. <span style="color:var(--danger)">*</span></label>
+        <select id="nameSelect" onchange="onNameSelect(this.value)">
+          <option value="">-- กดเลือกชื่อ นศท. --</option>
+        </select>
+        <div class="form-hint">กดเลือกชื่อจากรายการ ข้อมูลจะขึ้นให้อัตโนมัติ</div>
       </div>
+
+      <input type="hidden" id="stdId" />
 
       <div class="form-row">
         <label>ชื่อ-นามสกุล</label>
         <input type="text" id="stdName" readonly
                style="background:#f5f7fb; cursor:not-allowed; font-weight:600;"
-               placeholder="จะขึ้นอัตโนมัติเมื่อพิมพ์เลข นศท." />
+               placeholder="จะขึ้นอัตโนมัติเมื่อเลือกชื่อ" />
       </div>
 
       <div class="form-row">
@@ -778,60 +780,26 @@ function selectBus(num) {
   document.getElementById('bookingForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// ===== STUDENT LOOKUP =====
-function lookupStudent(val) {
-  val = val.trim();
-  const box = document.getElementById('searchResults');
-  const nameEl = document.getElementById('stdName');
-  const genderEl = document.getElementById('stdGender');
-  const genderDisplay = document.getElementById('stdGenderDisplay');
-
-  // Clear if empty
-  if (!val) {
-    box.style.display = 'none';
-    nameEl.value = '';
-    genderEl.value = '';
-    genderDisplay.value = '';
-    return;
-  }
-
-  // Exact match
-  const exact = STUDENT_DB.find(s => s.id === val);
-  if (exact) {
-    fillStudent(exact);
-    box.style.display = 'none';
-    return;
-  }
-
-  // Partial match (starts with)
-  const matches = STUDENT_DB.filter(s => s.id.startsWith(val)).slice(0, 8);
-  if (matches.length === 0) {
-    box.style.display = 'none';
-    nameEl.value = '';
-    genderEl.value = '';
-    genderDisplay.value = '';
-    return;
-  }
-
-  box.innerHTML = matches.map(s => `
-    <div onclick="selectStudent('${s.id}')"
-         style="padding:10px 14px; cursor:pointer; border-bottom:1px solid var(--border); font-size:14px;"
-         onmouseover="this.style.background='#f0f4ff'" onmouseout="this.style.background='white'">
-      <span style="font-weight:700; color:var(--primary)">${s.id}</span>
-      <span style="margin-left:10px">${s.name}</span>
-      <span style="margin-left:8px; font-size:12px; color:${s.gender==='หญิง'?'var(--female)':'var(--text-muted)'}">
-        ${s.gender==='หญิง'?'👧':'👦'} ${s.gender}
-      </span>
-    </div>`).join('');
-  box.style.display = 'block';
+// ===== POPULATE NAME DROPDOWN (เรียงตามรายชื่อ) =====
+function populateNameDropdown() {
+  const sel = document.getElementById('nameSelect');
+  const sorted = [...STUDENT_DB].sort((a, b) => a.name.localeCompare(b.name, 'th'));
+  sel.innerHTML = '<option value="">-- กดเลือกชื่อ นศท. --</option>' +
+    sorted.map(s => `<option value="${s.id}">${s.name} (${s.gender})</option>`).join('');
 }
 
-function selectStudent(id) {
+function onNameSelect(id) {
+  if (!id) {
+    document.getElementById('stdId').value = '';
+    document.getElementById('stdName').value = '';
+    document.getElementById('stdGender').value = '';
+    document.getElementById('stdGenderDisplay').value = '';
+    return;
+  }
   const s = STUDENT_DB.find(s => s.id === id);
   if (!s) return;
-  document.getElementById('stdId').value = id;
+  document.getElementById('stdId').value = s.id;
   fillStudent(s);
-  document.getElementById('searchResults').style.display = 'none';
 }
 
 function fillStudent(s) {
@@ -841,13 +809,7 @@ function fillStudent(s) {
   checkGenderMatch();
 }
 
-// Close dropdown on outside click
-document.addEventListener('click', (e) => {
-  if (!document.getElementById('stdId').contains(e.target)) {
-    const box = document.getElementById('searchResults');
-    if (box) box.style.display = 'none';
-  }
-});
+populateNameDropdown();
 
 function checkGenderMatch() {
   const gender = document.getElementById('stdGender').value;
@@ -884,9 +846,8 @@ function submitBooking() {
   const gender  = document.getElementById('stdGender').value;
   const busNum  = document.getElementById('selectedBus').value;
 
-  if (!stdId)   { showSystemAlert('กรุณากรอกเลขประจำตัว นศท.', 'warning'); return; }
-  if (!stdName) { showSystemAlert('ไม่พบเลข นศท. นี้ในระบบ กรุณาตรวจสอบ', 'danger'); return; }
-  if (!gender)  { showSystemAlert('ไม่พบข้อมูลประเภท นศท. กรุณาตรวจสอบเลข นศท.', 'danger'); return; }
+  if (!stdId || !stdName) { showSystemAlert('กรุณาเลือกชื่อ นศท. จากรายการ', 'warning'); return; }
+  if (!gender)  { showSystemAlert('ไม่พบข้อมูลประเภท นศท. กรุณาเลือกชื่อใหม่', 'danger'); return; }
   if (!busNum)  { showSystemAlert('กรุณาเลือกรถที่ต้องการจอง', 'warning'); return; }
   if (gender !== BUS_GENDER[parseInt(busNum)]) {
     showSystemAlert('ประเภท นศท. ไม่ตรงกับรถที่เลือก กรุณาตรวจสอบอีกครั้ง', 'danger');
