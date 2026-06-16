@@ -1,1154 +1,329 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ระบบจองรถ นศท. ชั้นปีที่ 2 - โรงเรียนมัธยมวัดหนองแขม</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+// ============================================================
+// Google Apps Script - ระบบจองรถ นศท. ชั้นปีที่ 2
+// โรงเรียนมัธยมวัดหนองแขม ปีการศึกษา 2569
+// v2: เพิ่มระบบสถานะอนุมัติการจอง (รออนุมัติ / อนุมัติแล้ว)
+// ============================================================
+// วิธีใช้:
+// 1. เปิด Google Sheets ที่ใช้งานอยู่ (CAR-RD2)
+// 2. ไปที่ Extensions > Apps Script
+// 3. วางโค้ดนี้ทับโค้ดเดิมทั้งหมด
+// 4. รันฟังก์ชัน migrateAddStatusColumn ครั้งเดียว (เพิ่มคอลัมน์สถานะ
+//    ให้แถวที่จองไว้ก่อนหน้านี้ กลายเป็น "รออนุมัติ" อัตโนมัติ)
+// 5. กด Deploy > Manage Deployments > แก้ไข (ไอคอนดินสอ) > Version: New
+//    แล้วกด Deploy (URL เดิมจะยังใช้ได้ ไม่ต้องเปลี่ยนใน booking.html)
+// ============================================================
 
-  :root {
-    --primary: #1a3a6e;
-    --primary-light: #2d5ba3;
-    --accent: #c8a84b;
-    --accent-light: #f0d68a;
-    --bg: #f5f7fb;
-    --card: #ffffff;
-    --text: #1a1a2e;
-    --text-muted: #5a6070;
-    --border: #dde2ee;
-    --success: #1d7a45;
-    --success-bg: #e8f5ee;
-    --danger: #b91c1c;
-    --danger-bg: #fef2f2;
-    --warning: #b45309;
-    --warning-bg: #fffbeb;
-    --female: #9d174d;
-    --female-bg: #fdf2f8;
-    --bus1: #dc2626; --bus2: #1d4ed8; --bus3: #15803d;
-    --bus4: #ca8a04; --bus5: #7c3aed; --bus6: #ea580c; --bus7: #db2777;
-  }
-
-  body {
-    font-family: 'Sarabun', 'Segoe UI', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    font-size: 15px;
-  }
-
-  /* ===== HEADER ===== */
-  header {
-    background: var(--primary);
-    color: white;
-    padding: 0;
-  }
-  .header-top {
-    background: linear-gradient(135deg, #0f2547 0%, #1a3a6e 50%, #1e4a8a 100%);
-    padding: 20px 24px 16px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-  .header-emblem {
-    width: 56px;
-    height: 56px;
-    background: var(--accent);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    flex-shrink: 0;
-  }
-  .header-text h1 {
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    margin-bottom: 2px;
-  }
-  .header-text p {
-    font-size: 13px;
-    opacity: 0.75;
-  }
-  .header-banner {
-    background: var(--accent);
-    color: #1a1a00;
-    padding: 8px 24px;
-    font-size: 13px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  /* ===== LAYOUT ===== */
-  .container { max-width: 960px; margin: 0 auto; padding: 20px 16px; }
-
-  /* ===== ALERT BOXES ===== */
-  .alert {
-    padding: 12px 16px;
-    border-radius: 8px;
-    font-size: 14px;
-    margin-bottom: 16px;
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  .alert-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
-  .alert-warning { background: var(--warning-bg); border: 1px solid #fcd34d; color: var(--warning); }
-  .alert-danger  { background: var(--danger-bg);  border: 1px solid #fca5a5; color: var(--danger); }
-  .alert-success { background: var(--success-bg); border: 1px solid #86efac; color: var(--success); }
-  .alert-info    { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; }
-
-  /* ===== SECTION HEADER ===== */
-  .section-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--primary);
-    padding-bottom: 8px;
-    border-bottom: 2px solid var(--accent);
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  /* ===== BUS GRID ===== */
-  .bus-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 14px;
-    margin-bottom: 24px;
-  }
-
-  .bus-card {
-    background: var(--card);
-    border: 1.5px solid var(--border);
-    border-radius: 12px;
-    overflow: hidden;
-    transition: box-shadow 0.2s, transform 0.15s;
-    cursor: pointer;
-  }
-  .bus-card:hover:not(.full) { box-shadow: 0 4px 16px rgba(0,0,0,0.12); transform: translateY(-2px); }
-  .bus-card.full { opacity: 0.7; cursor: not-allowed; }
-  .bus-card.full .bus-header { filter: grayscale(0.4); }
-
-  .bus-header {
-    padding: 12px 14px;
-    color: white;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .bus-icon { font-size: 26px; }
-  .bus-label { flex: 1; }
-  .bus-label h3 { font-size: 15px; font-weight: 700; }
-  .bus-label p { font-size: 12px; opacity: 0.85; margin-top: 1px; }
-
-  .bus-body { padding: 12px 14px; }
-
-  .capacity-bar-wrap {
-    background: #eef0f5;
-    border-radius: 6px;
-    height: 8px;
-    overflow: hidden;
-    margin-bottom: 8px;
-  }
-  .capacity-bar {
-    height: 100%;
-    border-radius: 6px;
-    transition: width 0.4s ease;
-  }
-
-  .capacity-text {
-    display: flex;
-    justify-content: space-between;
-    font-size: 13px;
-    color: var(--text-muted);
-  }
-  .capacity-count { font-weight: 700; font-size: 14px; }
-  .count-green { color: var(--success); }
-  .count-orange { color: var(--warning); }
-  .count-red { color: var(--danger); }
-
-  .full-badge {
-    display: inline-block;
-    background: var(--danger-bg);
-    color: var(--danger);
-    border: 1px solid #fca5a5;
-    border-radius: 20px;
-    padding: 3px 10px;
-    font-size: 12px;
-    font-weight: 700;
-    margin-top: 6px;
-  }
-  .open-badge {
-    display: inline-block;
-    background: var(--success-bg);
-    color: var(--success);
-    border: 1px solid #86efac;
-    border-radius: 20px;
-    padding: 3px 10px;
-    font-size: 12px;
-    font-weight: 600;
-    margin-top: 6px;
-  }
-
-  /* ===== BOOKING FORM ===== */
-  .form-card {
-    background: var(--card);
-    border: 1.5px solid var(--border);
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 24px;
-  }
-
-  .form-row { margin-bottom: 14px; }
-  .form-row label {
-    display: block;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--primary);
-    margin-bottom: 5px;
-  }
-  .form-row input, .form-row select {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1.5px solid var(--border);
-    border-radius: 8px;
-    font-size: 14px;
-    font-family: inherit;
-    color: var(--text);
-    background: white;
-    transition: border-color 0.2s;
-  }
-  .form-row input:focus, .form-row select:focus {
-    outline: none;
-    border-color: var(--primary-light);
-    box-shadow: 0 0 0 3px rgba(45,91,163,0.12);
-  }
-  .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
-
-  .btn-primary {
-    width: 100%;
-    padding: 12px;
-    background: var(--primary);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 15px;
-    font-weight: 700;
-    font-family: inherit;
-    cursor: pointer;
-    transition: background 0.2s;
-    margin-top: 4px;
-  }
-  .btn-primary:hover { background: var(--primary-light); }
-  .btn-primary:disabled { background: #9ca3af; cursor: not-allowed; }
-
-  /* ===== MODAL ===== */
-  .modal-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.55);
-    z-index: 1000;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-  }
-  .modal-overlay.active { display: flex; }
-  .modal {
-    background: white;
-    border-radius: 16px;
-    width: 100%;
-    max-width: 440px;
-    overflow: hidden;
-    animation: slideUp 0.2s ease;
-  }
-  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
-  .modal-header {
-    padding: 16px 20px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    border-bottom: 1px solid var(--border);
-  }
-  .modal-header h2 { font-size: 17px; font-weight: 700; }
-  .modal-body { padding: 16px 20px 20px; }
-  .modal-footer { padding: 0 20px 20px; display: flex; gap: 10px; }
-
-  .btn-cancel {
-    flex: 1;
-    padding: 10px;
-    border: 1.5px solid var(--border);
-    border-radius: 8px;
-    background: white;
-    font-size: 14px;
-    font-family: inherit;
-    cursor: pointer;
-    color: var(--text);
-  }
-  .btn-confirm {
-    flex: 2;
-    padding: 10px;
-    background: var(--primary);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 700;
-    font-family: inherit;
-    cursor: pointer;
-  }
-  .btn-confirm:hover { background: var(--primary-light); }
-
-  /* ===== RESULT ===== */
-  .result-card {
-    background: var(--success-bg);
-    border: 2px solid #86efac;
-    border-radius: 12px;
-    padding: 20px;
-    text-align: center;
-    margin-bottom: 24px;
-    display: none;
-  }
-  .result-icon { font-size: 48px; margin-bottom: 8px; }
-  .result-title { font-size: 18px; font-weight: 700; color: var(--success); margin-bottom: 4px; }
-  .result-detail { font-size: 14px; color: #166534; }
-  .pending-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--warning-bg);
-    border: 1.5px solid #fcd34d;
-    color: var(--warning);
-    border-radius: 20px;
-    padding: 6px 14px;
-    font-size: 13px;
-    font-weight: 700;
-    margin-top: 12px;
-  }
-
-  /* ===== SETUP PANEL ===== */
-  .setup-panel {
-    background: var(--card);
-    border: 1.5px solid var(--border);
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 24px;
-  }
-  .setup-row { display: flex; gap: 10px; margin-bottom: 10px; }
-  .setup-row input {
-    flex: 1;
-    padding: 9px 12px;
-    border: 1.5px solid var(--border);
-    border-radius: 8px;
-    font-size: 13px;
-    font-family: inherit;
-  }
-  .btn-secondary {
-    padding: 9px 16px;
-    background: var(--bg);
-    color: var(--primary);
-    border: 1.5px solid var(--primary);
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    font-family: inherit;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-  .btn-secondary:hover { background: #e8edf8; }
-
-  /* ===== PASSENGER LIST ===== */
-  .passenger-list {
-    max-height: 200px;
-    overflow-y: auto;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 13px;
-  }
-  .passenger-item {
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .passenger-item:last-child { border-bottom: none; }
-  .passenger-num {
-    width: 22px;
-    height: 22px;
-    background: var(--primary);
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    font-weight: 700;
-    flex-shrink: 0;
-  }
-
-  /* ===== SPINNER ===== */
-  .spinner {
-    display: inline-block;
-    width: 16px; height: 16px;
-    border: 2px solid rgba(255,255,255,0.4);
-    border-top-color: white;
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    vertical-align: middle;
-    margin-right: 6px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ===== TABS ===== */
-  .tabs { display: flex; gap: 2px; margin-bottom: 20px; background: #eef0f5; padding: 3px; border-radius: 10px; }
-  .tab {
-    flex: 1;
-    padding: 8px;
-    text-align: center;
-    font-size: 13px;
-    font-weight: 600;
-    border-radius: 8px;
-    cursor: pointer;
-    color: var(--text-muted);
-    transition: all 0.2s;
-    border: none;
-    background: transparent;
-    font-family: inherit;
-  }
-  .tab.active { background: white; color: var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
-
-  .tab-content { display: none; }
-  .tab-content.active { display: block; }
-
-  /* ===== INFO ROW ===== */
-  .info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 10px;
-    margin-bottom: 20px;
-  }
-  .info-item {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px;
-    text-align: center;
-  }
-  .info-num { font-size: 22px; font-weight: 700; color: var(--primary); }
-  .info-label { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-
-  /* ===== FOOTER ===== */
-  footer {
-    text-align: center;
-    padding: 20px;
-    font-size: 12px;
-    color: var(--text-muted);
-    border-top: 1px solid var(--border);
-    margin-top: 20px;
-  }
-
-  @media (max-width: 500px) {
-    .bus-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
-    .header-text h1 { font-size: 15px; }
-  }
-</style>
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-</head>
-<body>
-
-<header>
-  <div class="header-top">
-    <div class="header-emblem">🎖️</div>
-    <div class="header-text">
-      <h1>ระบบจองรถโดยสาร นศท. ชั้นปีที่ 2</h1>
-      <p>โรงเรียนมัธยมวัดหนองแขม · ปีการศึกษา 2569</p>
-    </div>
-  </div>
-  <div class="header-banner">
-    📌 ค่ารถ 945 บาท (45 บาท × 21 สัปดาห์) · ชำระครั้งเดียว · จองได้คันเดียวเท่านั้น
-  </div>
-</header>
-
-<div class="container">
-  </div>
-
-  <!-- ALERT BOX -->
-  <div id="systemAlert" style="display:none"></div>
-
-  <!-- TABS -->
-  <div class="tabs">
-    <button class="tab active" onclick="switchTab('book')">🚌 จองรถ</button>
-    <button class="tab" onclick="switchTab('status')">📊 สถานะรถ</button>
-    <button class="tab" onclick="switchTab('admin')">🔐 ผู้ดูแล</button>
-  </div>
-
-  <!-- ===== TAB: BOOK ===== -->
-  <div id="tab-book" class="tab-content active">
-
-    <!-- Summary Stats -->
-    <div class="info-grid">
-      <div class="info-item">
-        <div class="info-num" id="statTotal">7</div>
-        <div class="info-label">รถทั้งหมด</div>
-      </div>
-      <div class="info-item">
-        <div class="info-num" id="statBooked">-</div>
-        <div class="info-label">จองแล้ว</div>
-      </div>
-      <div class="info-item">
-        <div class="info-num" id="statRemain">-</div>
-        <div class="info-label">ที่นั่งว่าง</div>
-      </div>
-      <div class="info-item">
-        <div class="info-num" id="statFull">-</div>
-        <div class="info-label">รถที่เต็มแล้ว</div>
-      </div>
-    </div>
-
-    <!-- Result Card -->
-    <div class="result-card" id="resultCard">
-      <div class="result-icon">✅</div>
-      <div class="result-title" id="resultTitle"></div>
-      <div class="result-detail" id="resultDetail"></div>
-    </div>
-
-    <!-- Bus Cards -->
-    <div class="section-title">🚌 เลือกรถที่ต้องการจอง</div>
-
-    <div id="busFullAlert" class="alert alert-danger" style="display:none">
-      <span class="alert-icon">🚫</span>
-      <div><strong>ปิดระบบจอง</strong> — รถทุกคันเต็มแล้ว ไม่สามารถจองได้อีก</div>
-    </div>
-
-    <div class="bus-grid" id="busGrid">
-      <!-- Rendered by JS -->
-    </div>
-
-    <!-- Booking Form -->
-    <div class="form-card" id="bookingForm">
-      <div class="section-title">📝 กรอกข้อมูลการจอง</div>
-
-      <div class="form-row">
-        <label>เลือกชื่อ นศท. <span style="color:var(--danger)">*</span></label>
-        <select id="nameSelect" onchange="onNameSelect(this.value)">
-          <option value="">-- กดเลือกชื่อ นศท. --</option>
-        </select>
-        <div class="form-hint">กดเลือกชื่อจากรายการ ข้อมูลจะขึ้นให้อัตโนมัติ</div>
-      </div>
-
-      <input type="hidden" id="stdId" />
-
-      <div class="form-row">
-        <label>ชื่อ-นามสกุล</label>
-        <input type="text" id="stdName" readonly
-               style="background:#f5f7fb; cursor:not-allowed; font-weight:600;"
-               placeholder="จะขึ้นอัตโนมัติเมื่อเลือกชื่อ" />
-      </div>
-
-      <div class="form-row">
-        <label>ประเภท นศท.</label>
-        <input type="text" id="stdGenderDisplay" readonly
-               style="background:#f5f7fb; cursor:not-allowed; font-weight:600;"
-               placeholder="จะขึ้นอัตโนมัติ" />
-        <input type="hidden" id="stdGender" />
-      </div>
-
-      <div class="form-row">
-        <label>รถที่เลือก</label>
-        <input type="text" id="selectedBusDisplay" readonly style="background:#f5f7fb; cursor:not-allowed;" placeholder="กดเลือกจากการ์ดรถด้านบน" />
-        <input type="hidden" id="selectedBus" />
-      </div>
-
-      <div class="alert alert-warning" id="genderWarning" style="display:none">
-        <span class="alert-icon">⚠️</span>
-        <div>ประเภทที่เลือกไม่ตรงกับรถที่กำหนด กรุณาตรวจสอบ</div>
-      </div>
-
-      <button class="btn-primary" id="btnBook" onclick="submitBooking()">
-        🚌 ยืนยันจอง 945 บาท
-      </button>
-    </div>
-
-  </div>
-
-  <!-- ===== TAB: STATUS ===== -->
-  <div id="tab-status" class="tab-content">
-    <div class="section-title">📊 สถานะรถแต่ละคัน</div>
-    <div id="statusDetail">
-      <div style="text-align:center; padding:30px; color:var(--text-muted);">
-        กำลังโหลดข้อมูล...
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== TAB: ADMIN ===== -->
-  <div id="tab-admin" class="tab-content">
-    <div class="section-title">🔐 ผู้ดูแลระบบ</div>
-    <div class="form-card">
-      <div class="form-row">
-        <label>รหัสผ่านผู้ดูแล</label>
-        <input type="password" id="adminPass" placeholder="กรอกรหัสผ่าน" />
-      </div>
-      <button class="btn-primary" onclick="adminLogin()">เข้าสู่ระบบ</button>
-    </div>
-    <div id="adminPanel" style="display:none">
-      <div class="alert alert-success">
-        <span class="alert-icon">✅</span>
-        <div>เข้าสู่ระบบสำเร็จ · โหมดผู้ดูแลระบบ</div>
-      </div>
-      <div class="form-card">
-        <div class="section-title">รายชื่อผู้จองทั้งหมด</div>
-        <div class="form-row">
-          <label>เลือกรถ</label>
-          <select id="adminBusSelect" onchange="loadPassengers()">
-            <option value="">-- เลือกดูรถคันใด --</option>
-            <option value="1">รถคันที่ 1 · สีแดง (RED)</option>
-            <option value="2">รถคันที่ 2 · สีน้ำเงิน (BLUE)</option>
-            <option value="3">รถคันที่ 3 · สีเขียว (GREEN)</option>
-            <option value="4">รถคันที่ 4 · สีเหลือง (YELLOW)</option>
-            <option value="5">รถคันที่ 5 · สีม่วง (PURPLE)</option>
-            <option value="6">รถคันที่ 6 · สีส้ม (ORANGE)</option>
-            <option value="7">รถคันที่ 7 · สีชมพู PINK (หญิง)</option>
-          </select>
-        </div>
-        <div id="passengerList"></div>
-        <div id="passengerExportRow" style="display:none; margin-top:10px; gap:8px;">
-          <button class="btn-secondary" style="width:100%; margin-bottom:8px;" onclick="printPassengerList()">🖨️ พิมพ์รายชื่อรถคันนี้</button>
-          <button class="btn-secondary" style="width:100%;" onclick="exportPassengerCSV()">📥 ส่งออก CSV รถคันนี้</button>
-        </div>
-      </div>
-      <div class="form-card">
-        <div class="section-title">ส่งออกรายชื่อทุกคัน</div>
-        <div class="form-hint" style="margin-bottom:10px">พิมพ์/ส่งออกรายชื่อผู้จองครบทั้ง 7 คันในครั้งเดียว สำหรับใช้แจกหน้ารถ</div>
-        <button class="btn-primary" onclick="printAllBuses()">🖨️ พิมพ์รายชื่อทุกคัน</button>
-      </div>
-      <div class="form-card">
-        <div class="section-title">ยกเลิกการจอง</div>
-        <div class="form-row">
-          <label>เลขประจำตัว นศท. ที่ต้องการยกเลิก</label>
-          <input type="text" id="cancelId" placeholder="เลข นศท." />
-        </div>
-        <button class="btn-primary" style="background:var(--danger)" onclick="cancelBooking()">ยกเลิกการจอง</button>
-      </div>
-    </div>
-  </div>
-
-</div>
-
-<!-- CONFIRM MODAL -->
-<div class="modal-overlay" id="confirmModal">
-  <div class="modal">
-    <div class="modal-header">
-      <span style="font-size:24px">🚌</span>
-      <div>
-        <h2>ยืนยันการจองรถ</h2>
-        <p style="font-size:13px; color:var(--text-muted); margin-top:2px;">กรุณาตรวจสอบข้อมูลให้ถูกต้อง</p>
-      </div>
-    </div>
-    <div class="modal-body">
-      <div id="confirmDetail" style="background:var(--bg); border-radius:8px; padding:14px; font-size:14px; line-height:2;"></div>
-      <div class="alert alert-warning" style="margin-top:12px;">
-        <span class="alert-icon">⚠️</span>
-        <div>เมื่อยืนยันแล้ว <strong>ไม่สามารถเปลี่ยนรถได้</strong> หากต้องการเปลี่ยน ต้องติดต่อครูแซม</div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="closeModal()">ยกเลิก</button>
-      <button class="btn-confirm" id="btnConfirm" onclick="confirmBooking()">✅ ยืนยันจอง</button>
-    </div>
-  </div>
-</div>
-
-<footer>
-  ระบบจองรถโดยสาร นศท. ชั้นปีที่ 2 · โรงเรียนมัธยมวัดหนองแขม · ปีการศึกษา 2569<br>
-  ติดต่อปัญหา: ครูแซม ห้องหลังเสาธง
-</footer>
-
-<script>
-// ===== CONFIG =====
-// ฐานข้อมูล นศท. ทั้งหมด 154 คน
-const STUDENT_DB = [{"id": "1683328965", "name": "กนกพล แก้วทองเมือง", "gender": "ชาย"}, {"id": "1683328966", "name": "กรวิชญ์ บุญทา", "gender": "ชาย"}, {"id": "1683328967", "name": "กฤตวัฒน์ กองสิงห์", "gender": "ชาย"}, {"id": "1683312088", "name": "กฤติเดช ทองสุภารักคณาภา", "gender": "ชาย"}, {"id": "1683328968", "name": "กฤษณะพัฒน์ ตันสงวน", "gender": "ชาย"}, {"id": "1683328969", "name": "กฤษตรีเทพ ทองอร่าม", "gender": "ชาย"}, {"id": "1683328970", "name": "กวิน คำผา", "gender": "ชาย"}, {"id": "1683312089", "name": "กิตติเชษฐ์ มนต์พรพรรษ", "gender": "ชาย"}, {"id": "1683312090", "name": "คณิน เขตชัยภูมิ", "gender": "ชาย"}, {"id": "1683312091", "name": "จักรธร จันทร์น้อย", "gender": "ชาย"}, {"id": "1683328972", "name": "จิตติพัฒน์ จันทร์มี", "gender": "ชาย"}, {"id": "1683312092", "name": "ฉัตรดนัย เปรมอมรกิจ", "gender": "ชาย"}, {"id": "1683328973", "name": "ฉัตรบดินทร์ ปานดี", "gender": "ชาย"}, {"id": "1683328974", "name": "ชนธัญ ศรีเจิมทอง", "gender": "ชาย"}, {"id": "1683328975", "name": "ชนะกฤช กลอยสวาท", "gender": "ชาย"}, {"id": "1683328976", "name": "ชยากร งามถาวรวงศ์", "gender": "ชาย"}, {"id": "1683312093", "name": "ชยากร พจนาภิรักษ์", "gender": "ชาย"}, {"id": "1683328977", "name": "ชินดนัย เดชะมี", "gender": "ชาย"}, {"id": "1683328981", "name": "ณฐกร พูนนุช", "gender": "ชาย"}, {"id": "1683312094", "name": "ณัฏฐกรณ์ ภูนุช", "gender": "ชาย"}, {"id": "1683312095", "name": "ณัฏฐ์พีรยช อิทธิสัญญากร", "gender": "ชาย"}, {"id": "1683312096", "name": "ณัฐกานต์ คชงาม", "gender": "ชาย"}, {"id": "1683328982", "name": "ณัฐกิตติ์ ธนโชติธิติพงศ์", "gender": "ชาย"}, {"id": "1683312097", "name": "ณัฐชนน ผ่องพันธุ์", "gender": "ชาย"}, {"id": "1683328983", "name": "ณัฐนนท์ เต้นรัมย์", "gender": "ชาย"}, {"id": "1683328984", "name": "ณัฐพล กันบัว", "gender": "ชาย"}, {"id": "1683328985", "name": "ณัฐพัชร์ ภักดี", "gender": "ชาย"}, {"id": "1683328986", "name": "ณัฐพัทร ทองสิมา", "gender": "ชาย"}, {"id": "1683328987", "name": "ณิธิพงษ์ ซุ้มชัยวงศ์", "gender": "ชาย"}, {"id": "1683312149", "name": "ถิรวัฒน์ วังคะฮาด", "gender": "ชาย"}, {"id": "1683312150", "name": "ถิรายุ ไชยเกตุ", "gender": "ชาย"}, {"id": "1683312151", "name": "ทรัพย์สิน ศรีศิลปอุดม", "gender": "ชาย"}, {"id": "1683312152", "name": "ทศพร กระแสโท", "gender": "ชาย"}, {"id": "1683312153", "name": "ทิพากร ลำพุทธา", "gender": "ชาย"}, {"id": "1683312154", "name": "ธนกร โจยะกุลเจริญ", "gender": "ชาย"}, {"id": "1683328988", "name": "ธนกร โพธิ์ประพันธ์", "gender": "ชาย"}, {"id": "1683312155", "name": "ธนกฤต เตชะศุภสิน", "gender": "ชาย"}, {"id": "1683328989", "name": "ธนชาต นาแหยม", "gender": "ชาย"}, {"id": "1683312156", "name": "ธนนนท์ คชเดช", "gender": "ชาย"}, {"id": "1683312157", "name": "ธนพนธ์ อาจทวีกุล", "gender": "ชาย"}, {"id": "1683312158", "name": "ธนพล พลหาญ", "gender": "ชาย"}, {"id": "1683328940", "name": "ธนภูมิ ลาภสุนทร", "gender": "ชาย"}, {"id": "1683328941", "name": "ธนะเทพ ชีพชูชัย", "gender": "ชาย"}, {"id": "1683328942", "name": "ธนา พิบูลธรรมนนท์", "gender": "ชาย"}, {"id": "1683328943", "name": "ธรดล กิ่งสวัสดิ์", "gender": "ชาย"}, {"id": "1683312160", "name": "ธรานนท์ นาประทุม", "gender": "ชาย"}, {"id": "1683312159", "name": "ธราเทพ พวงกิจจา", "gender": "ชาย"}, {"id": "1683328944", "name": "ธัญเทพ จันทร์ธรรม", "gender": "ชาย"}, {"id": "1683312161", "name": "ธิติกร สีดำ", "gender": "ชาย"}, {"id": "1683328945", "name": "ธีรภัทร์ ทวีก้านตง", "gender": "ชาย"}, {"id": "1683328946", "name": "นนทชา วงษ์ปาน", "gender": "ชาย"}, {"id": "1683328947", "name": "นนทนพงศ์ กุลปภาวิณ", "gender": "ชาย"}, {"id": "1683312036", "name": "นพคุณ เรืองเชื้อเหมือน", "gender": "ชาย"}, {"id": "1683312037", "name": "นพรัตน์ พันธ์หารี", "gender": "ชาย"}, {"id": "1683312038", "name": "นพรุจ วรัญญูวัฒนะ", "gender": "ชาย"}, {"id": "1683328948", "name": "นพรุจน์ อินทร์ประดับ", "gender": "ชาย"}, {"id": "1683312039", "name": "นรานนท์ เลิศหัตถพงศ์", "gender": "ชาย"}, {"id": "1683312040", "name": "นัทนัน บุญสนธิ", "gender": "ชาย"}, {"id": "1683312041", "name": "นิชคุณ นิ่มทองคำ", "gender": "ชาย"}, {"id": "1683328949", "name": "นิติภูมิ ธนสีลังกูร", "gender": "ชาย"}, {"id": "1683328950", "name": "บุณกรินทร์ เกาะกลาง", "gender": "ชาย"}, {"id": "1683312042", "name": "บุณยพัฒน์ ทิพย์ประภาพร", "gender": "ชาย"}, {"id": "1683312043", "name": "บุณยฤทธิ์ แตงสมุทร", "gender": "ชาย"}, {"id": "1683328951", "name": "ปฏิภาณ จุ้ยทอง", "gender": "ชาย"}, {"id": "1683312045", "name": "ปรมะ เกตุโกศล", "gender": "ชาย"}, {"id": "1683328952", "name": "ปรมัทถ วงศาจันทร์", "gender": "ชาย"}, {"id": "1683312046", "name": "ปรัญชัย วรเลิศชัยฤทธิ์", "gender": "ชาย"}, {"id": "1683328953", "name": "ปริญญวัฒน์ ไชยวัฒน์เธียรกุล", "gender": "ชาย"}, {"id": "1683312047", "name": "ปริทัต โกสูงเนิน", "gender": "ชาย"}, {"id": "1683312048", "name": "ปรินทร์ บัวพา", "gender": "ชาย"}, {"id": "1683328954", "name": "ปิยะพงษ์ วรพันธ์", "gender": "ชาย"}, {"id": "1683312044", "name": "ปเมธินท์ แย้มนุ่น", "gender": "ชาย"}, {"id": "1683312009", "name": "พงศกร ฝาพิมาย", "gender": "ชาย"}, {"id": "1683328955", "name": "พรเทพ วรรณวรเศรษฐ", "gender": "ชาย"}, {"id": "1683312010", "name": "พศุตม์ เต็มใจรัก", "gender": "ชาย"}, {"id": "1683328956", "name": "พิชญะ โฮ่ทองคำ", "gender": "ชาย"}, {"id": "1683312011", "name": "พิชยะ คุ้มอักษร", "gender": "ชาย"}, {"id": "1683312012", "name": "พีรพัฒน์ ปานเกษม", "gender": "ชาย"}, {"id": "1683312013", "name": "พีรพัฒน์ หนูเสน", "gender": "ชาย"}, {"id": "1683328957", "name": "พุฒิพัชร ฟองสาลี", "gender": "ชาย"}, {"id": "1683328960", "name": "ภัทรพล เลี้ยงพรม", "gender": "ชาย"}, {"id": "1683328961", "name": "ภัทรวัฒน์ รักงาม", "gender": "ชาย"}, {"id": "1683328958", "name": "ภัทร์นรินท์ ชัยเดชาภินันท์", "gender": "ชาย"}, {"id": "1683328959", "name": "ภัทร์พงศ์ อุดมพรวิรัตน์", "gender": "ชาย"}, {"id": "1683312014", "name": "ภาณุวัฒน์ พานเพ็ง", "gender": "ชาย"}, {"id": "1683328962", "name": "ภานุพงษ์ สุวรรณนัง", "gender": "ชาย"}, {"id": "1683328963", "name": "ภาวัต เศรษฐบุตร", "gender": "ชาย"}, {"id": "1683312015", "name": "ภูริณัฐ อ่อนศรี", "gender": "ชาย"}, {"id": "1683312077", "name": "วทัญญู ศิริสวัสดิ์", "gender": "ชาย"}, {"id": "1683312078", "name": "วรภัทร ชูทอง", "gender": "ชาย"}, {"id": "1683312079", "name": "วรวัตร หุตจิตต์", "gender": "ชาย"}, {"id": "1683328964", "name": "วรวิช บัวเพชร", "gender": "ชาย"}, {"id": "1683329139", "name": "วสิษฐ์พล รอดพันธุ์", "gender": "ชาย"}, {"id": "1683329140", "name": "วัชรินทร์ แย้มสายหยุด", "gender": "ชาย"}, {"id": "1683312080", "name": "วิชัยยุทธ อยู่มงคล", "gender": "ชาย"}, {"id": "1683312081", "name": "ศักรินทร์ ล้อมเล็ก", "gender": "ชาย"}, {"id": "1683329141", "name": "ศิรวิชญ์ สายสว่าง", "gender": "ชาย"}, {"id": "1683329143", "name": "ศุภกร สุดพูล", "gender": "ชาย"}, {"id": "1683329142", "name": "ศุภกร เรืองโรจน์", "gender": "ชาย"}, {"id": "1683312082", "name": "ศุภณัฐ งามสี", "gender": "ชาย"}, {"id": "1683312083", "name": "ศุภณัฐ สังเรือง", "gender": "ชาย"}, {"id": "1683312084", "name": "ศุภณัฐ สุภกรรม", "gender": "ชาย"}, {"id": "1683329144", "name": "ศุภวิชญ์ กลยาณีย์", "gender": "ชาย"}, {"id": "1683312085", "name": "สถิตคุณ สอาดใจ", "gender": "ชาย"}, {"id": "1683312086", "name": "สรยุทธ แสนสุรีย์", "gender": "ชาย"}, {"id": "1683312087", "name": "สรวิชญ์ ใจดี", "gender": "ชาย"}, {"id": "1683329145", "name": "สิรวิชญ์ บุญเอื้อ", "gender": "ชาย"}, {"id": "1683312049", "name": "สิริชัย ไทยน้อย", "gender": "ชาย"}, {"id": "1683312050", "name": "สิริเชษฐ์ สังข์วิสิทธิ์", "gender": "ชาย"}, {"id": "1683312051", "name": "สุกฤต ชินวงศ์", "gender": "ชาย"}, {"id": "1683312052", "name": "สุขสรรค์ พลรักษา", "gender": "ชาย"}, {"id": "1683329146", "name": "สุทธิรักษ์ เกิดเพิ่ม", "gender": "ชาย"}, {"id": "1683329147", "name": "สุภนัย แซ่ฮึง", "gender": "ชาย"}, {"id": "1683312053", "name": "อนาวิน ภูทองเป้ง", "gender": "ชาย"}, {"id": "1683329148", "name": "อรรถพล เที่ยงแท้", "gender": "ชาย"}, {"id": "1683329149", "name": "อัศนัย โสนะจิตร", "gender": "ชาย"}, {"id": "1683329150", "name": "อัศวกรณ์ มิลินเบญญาทัศน์", "gender": "ชาย"}, {"id": "1683329151", "name": "อาชวิน เพ็งหมัด", "gender": "ชาย"}, {"id": "1683312054", "name": "อาทิตย์ ไชยปัญญา", "gender": "ชาย"}, {"id": "1683329152", "name": "อานนท์ แทนไทยสงค์", "gender": "ชาย"}, {"id": "1683329153", "name": "อิชย์ ศรีจรูญ", "gender": "ชาย"}, {"id": "1683314307", "name": "อินเตอร์ หัสคำ", "gender": "ชาย"}, {"id": "1683328971", "name": "เกียรติกมล อุตะมะ", "gender": "ชาย"}, {"id": "1683312098", "name": "เตชิต จันทร์พินิจ", "gender": "ชาย"}, {"id": "1683312016", "name": "เมธาวิน เรือนนาค", "gender": "ชาย"}, {"id": "1683329154", "name": "เอลีชา ขินทอง", "gender": "ชาย"}, {"id": "1683328979", "name": "ไชยกร ขำโยม", "gender": "ชาย"}, {"id": "1683328980", "name": "ไชยวัฒน์ พงษ์นาค", "gender": "ชาย"}, {"id": "0683328900", "name": "กรชนก กระจ่างศรี", "gender": "หญิง"}, {"id": "0683328901", "name": "กวิสรา ภูมิลำเนา", "gender": "หญิง"}, {"id": "0683316686", "name": "กิตติยาพร เนาวบุตร", "gender": "หญิง"}, {"id": "0683316687", "name": "ชณพรรณ โดรินทร์", "gender": "หญิง"}, {"id": "0683328902", "name": "ญาราภรณ์ วงค์ขันธ์", "gender": "หญิง"}, {"id": "0683316688", "name": "ณัชชา ดำริพัฒนสกุล", "gender": "หญิง"}, {"id": "0683316689", "name": "ณัฐฐานันท์ ทิพย์จ้อย", "gender": "หญิง"}, {"id": "0683316690", "name": "ธนพร ปานยิ้ม", "gender": "หญิง"}, {"id": "0683316692", "name": "ปสุตา ฑัตตะวร", "gender": "หญิง"}, {"id": "0683328903", "name": "ปาณิตา ศรีแกล้ว", "gender": "หญิง"}, {"id": "0683328904", "name": "ปุญญวี เจริญคุณ", "gender": "หญิง"}, {"id": "0683316693", "name": "พลอยนพเก้า รุ่งเรือง", "gender": "หญิง"}, {"id": "0683316694", "name": "พิมพ์ณดา พงศ์ธรรมภักดิ์", "gender": "หญิง"}, {"id": "0683316912", "name": "ภคกนกพร ทวีโชติธนัท", "gender": "หญิง"}, {"id": "0683328905", "name": "ภคพร ยิ่งรักษา", "gender": "หญิง"}, {"id": "0683316695", "name": "รินรดา วิวัฒนาวรารมย์", "gender": "หญิง"}, {"id": "0683316696", "name": "วรกันยา สุจริต", "gender": "หญิง"}, {"id": "0683316697", "name": "ศศิกาญจน์ แก้วนิพนธ์", "gender": "หญิง"}, {"id": "0683316698", "name": "ศศิกานต์ สิงห์คลี", "gender": "หญิง"}, {"id": "0683316699", "name": "ศศิธร หลวงสมบัติ", "gender": "หญิง"}, {"id": "0683328906", "name": "ศุภาพิชญ์ ล้อมเวียง", "gender": "หญิง"}, {"id": "0683316659", "name": "อินทิรา พางกะสา", "gender": "หญิง"}, {"id": "0683316691", "name": "เบญญาภา สิโตทัย", "gender": "หญิง"}, {"id": "1681930393", "name": "นฤเบศร์ เกิดผล", "gender": "ชาย"}, {"id": "1686000329", "name": "รพีภัทร อ่อนทองหลาง", "gender": "ชาย"}, {"id": "1681901452", "name": "วัชรากร คล่องแคล่ว", "gender": "ชาย"}];
+const SPREADSHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
 const MAX_PER_BUS = 23;
 const TOTAL_BUSES = 7;
-const ADMIN_PASSWORD = 'SAM2206'; // เปลี่ยนรหัสได้ที่นี่
-const BUS_COLORS = {
-  1: '#dc2626', 2: '#1d4ed8', 3: '#15803d',
-  4: '#ca8a04', 5: '#7c3aed', 6: '#ea580c', 7: '#db2777'
-};
-const BUS_LABELS = {
-  1:'สีแดง (RED)', 2:'สีน้ำเงิน (BLUE)', 3:'สีเขียว (GREEN)',
-  4:'สีเหลือง (YELLOW)', 5:'สีม่วง (PURPLE)', 6:'สีส้ม (ORANGE)', 7:'สีชมพู (PINK) · หญิง'
-};
-const BUS_GENDER = { 1:'ชาย',2:'ชาย',3:'ชาย',4:'ชาย',5:'ชาย',6:'ชาย',7:'หญิง' };
+const ADMIN_PASSWORD = 'SAM2206'; // *** เปลี่ยนรหัสผ่านที่นี่ ***
+const BUS_GENDER = {1:'ชาย',2:'ชาย',3:'ชาย',4:'ชาย',5:'ชาย',6:'ชาย',7:'หญิง'};
 
-let SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx8FKX__VtUm1yZT733AzCgjGIeHj7zU7NPXDaWpolc4TLU_OA0EYgrVweQEVzXyu2y/exec';
-let busData = {};
-let selectedBusNum = null;
-let pendingBooking = null;
+const STATUS_PENDING  = 'รออนุมัติ';
+const STATUS_APPROVED = 'อนุมัติแล้ว';
 
-// ===== INIT =====
-window.onload = function() {
-  loadBusStatus();
-};
+// ===== SETUP: สร้าง Sheet อัตโนมัติ =====
+function setupSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
 
+  // Sheet รายการจอง
+  let bookingSheet = ss.getSheetByName('Bookings');
+  if (!bookingSheet) {
+    bookingSheet = ss.insertSheet('Bookings');
+    bookingSheet.getRange(1, 1, 1, 8).setValues([[
+      'ลำดับ', 'เลข นศท.', 'ชื่อ-นามสกุล', 'ประเภท', 'รถคันที่', 'ที่นั่งที่', 'วันที่จอง', 'สถานะ'
+    ]]);
+    bookingSheet.getRange(1, 1, 1, 8).setFontWeight('bold').setBackground('#1a3a6e').setFontColor('white');
+    bookingSheet.setFrozenRows(1);
+  }
 
-// ===== LOAD BUS STATUS =====
-async function loadBusStatus() {
-  if (!SCRIPT_URL) return;
-  try {
-    const res = await fetch(SCRIPT_URL + '?action=status');
-    const data = await res.json();
-    if (data.success) {
-      busData = data.buses;
-      renderBusCards(busData);
-      updateStats(busData);
-      renderStatusDetail(busData);
+  // Sheet สรุปสถานะรถ
+  let statusSheet = ss.getSheetByName('BusStatus');
+  if (!statusSheet) {
+    statusSheet = ss.insertSheet('BusStatus');
+    statusSheet.getRange(1, 1, 1, 4).setValues([['รถคันที่', 'ประเภท', 'จองแล้ว', 'ที่นั่งว่าง']]);
+    statusSheet.getRange(1, 1, 1, 4).setFontWeight('bold').setBackground('#1a3a6e').setFontColor('white');
+    for (let i = 1; i <= TOTAL_BUSES; i++) {
+      statusSheet.getRange(i+1, 1, 1, 4).setValues([[
+        i, BUS_GENDER[i] || 'ชาย', 0, MAX_PER_BUS
+      ]]);
     }
-  } catch(e) {
-    showSystemAlert('ไม่สามารถเชื่อมต่อ Google Sheets ได้ · ' + e.message, 'danger');
-    renderBusCards({});
-  }
-}
-
-// ===== RENDER BUS CARDS =====
-function renderBusCards(data) {
-  const grid = document.getElementById('busGrid');
-  let allFull = true;
-  let html = '';
-
-  for (let i = 1; i <= TOTAL_BUSES; i++) {
-    const count = (data[i] && data[i].count) || 0;
-    const passengers = (data[i] && data[i].passengers) || [];
-    const isFull = count >= MAX_PER_BUS;
-    const isSelected = selectedBusNum == i;
-    if (!isFull) allFull = false;
-
-    const pct = Math.round((count / MAX_PER_BUS) * 100);
-    let barColor = '#22c55e';
-    let cntClass = 'count-green';
-    if (pct >= 80) { barColor = '#ef4444'; cntClass = 'count-red'; }
-    else if (pct >= 60) { barColor = '#f59e0b'; cntClass = 'count-orange'; }
-
-    const badge = isFull
-      ? `<div class="full-badge">🚫 เต็มแล้ว</div>`
-      : `<div class="open-badge">✅ ว่าง ${MAX_PER_BUS - count} ที่</div>`;
-
-    const gender = BUS_GENDER[i] === 'หญิง' ? '👧 หญิงเท่านั้น' : '👦 ชาย';
-
-    html += `
-      <div class="bus-card ${isFull ? 'full' : ''} ${isSelected ? 'selected' : ''}"
-           id="busCard${i}"
-           onclick="${isFull ? '' : `selectBus(${i})`}"
-           style="${isSelected ? `border: 2px solid ${BUS_COLORS[i]}; box-shadow: 0 0 0 3px ${BUS_COLORS[i]}30;` : ''}">
-        <div class="bus-header" style="background:${isFull ? '#9ca3af' : BUS_COLORS[i]}">
-          <div class="bus-icon">🚌</div>
-          <div class="bus-label">
-            <h3>รถคันที่ ${i}</h3>
-            <p>${BUS_LABELS[i]} · ${gender}</p>
-          </div>
-        </div>
-        <div class="bus-body">
-          <div class="capacity-bar-wrap">
-            <div class="capacity-bar" style="width:${pct}%; background:${barColor}"></div>
-          </div>
-          <div class="capacity-text">
-            <span class="${cntClass} capacity-count">${count} / ${MAX_PER_BUS} คน</span>
-            <span>${pct}%</span>
-          </div>
-          ${badge}
-        </div>
-      </div>`;
   }
 
-  grid.innerHTML = html;
-
-  if (allFull && Object.keys(data).length > 0) {
-    document.getElementById('busFullAlert').style.display = 'flex';
-    document.getElementById('bookingForm').style.display = 'none';
-  } else {
-    document.getElementById('busFullAlert').style.display = 'none';
-    document.getElementById('bookingForm').style.display = 'block';
-  }
+  return { bookingSheet, statusSheet };
 }
 
-function selectBus(num) {
-  selectedBusNum = num;
-  document.getElementById('selectedBus').value = num;
-  document.getElementById('selectedBusDisplay').value =
-    `รถคันที่ ${num} · ${BUS_LABELS[num]} (${BUS_GENDER[num]})`;
-  renderBusCards(busData);
-  checkGenderMatch();
-  document.getElementById('bookingForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
+// ===== MIGRATION: เพิ่มคอลัมน์สถานะให้แถวเก่าที่จองไว้ก่อนหน้านี้ =====
+// รันฟังก์ชันนี้ "ครั้งเดียว" จาก Apps Script editor (เลือกฟังก์ชันนี้แล้วกด Run)
+function migrateAddStatusColumn() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Bookings');
+  if (!sheet) { setupSheets(); return; }
 
-// ===== POPULATE NAME DROPDOWN (เรียงตามรายชื่อ) =====
-function populateNameDropdown() {
-  const sel = document.getElementById('nameSelect');
-  const sorted = [...STUDENT_DB].sort((a, b) => a.name.localeCompare(b.name, 'th'));
-  sel.innerHTML = '<option value="">-- กดเลือกชื่อ นศท. --</option>' +
-    sorted.map(s => `<option value="${s.id}">${s.name} (${s.gender})</option>`).join('');
-}
+  const headerRange = sheet.getRange(1, 1, 1, sheet.getLastColumn());
+  const headers = headerRange.getValues()[0];
 
-function onNameSelect(id) {
-  if (!id) {
-    document.getElementById('stdId').value = '';
-    document.getElementById('stdName').value = '';
-    document.getElementById('stdGender').value = '';
-    document.getElementById('stdGenderDisplay').value = '';
-    return;
-  }
-  const s = STUDENT_DB.find(s => s.id === id);
-  if (!s) return;
-  document.getElementById('stdId').value = s.id;
-  fillStudent(s);
-}
-
-function fillStudent(s) {
-  document.getElementById('stdName').value = s.name;
-  document.getElementById('stdGender').value = s.gender;
-  document.getElementById('stdGenderDisplay').value = s.gender === 'หญิง' ? '👧 นศท.หญิง (รถคันที่ 7)' : '👦 นศท.ชาย (รถคันที่ 1–6)';
-  checkGenderMatch();
-}
-
-populateNameDropdown();
-
-function checkGenderMatch() {
-  const gender = document.getElementById('stdGender').value;
-  const busNum = selectedBusNum;
-  if (!gender || !busNum) return;
-  const expected = BUS_GENDER[busNum];
-  const warn = document.getElementById('genderWarning');
-  if (gender !== expected) {
-    warn.style.display = 'flex';
-    warn.querySelector('div').innerHTML = `⚠️ รถคันที่ ${busNum} สำหรับ นศท. <strong>${expected}</strong> เท่านั้น กรุณาเลือกรถให้ถูกต้อง`;
-  } else {
-    warn.style.display = 'none';
-  }
-}
-
-// ===== STATS =====
-function updateStats(data) {
-  let totalBooked = 0, totalFull = 0;
-  for (let i = 1; i <= TOTAL_BUSES; i++) {
-    const c = (data[i] && data[i].count) || 0;
-    totalBooked += c;
-    if (c >= MAX_PER_BUS) totalFull++;
-  }
-  const totalSeats = TOTAL_BUSES * MAX_PER_BUS;
-  document.getElementById('statBooked').textContent = totalBooked;
-  document.getElementById('statRemain').textContent = totalSeats - totalBooked;
-  document.getElementById('statFull').textContent = totalFull;
-}
-
-// ===== SUBMIT BOOKING =====
-function submitBooking() {
-  const stdId   = document.getElementById('stdId').value.trim();
-  const stdName = document.getElementById('stdName').value.trim();
-  const gender  = document.getElementById('stdGender').value;
-  const busNum  = document.getElementById('selectedBus').value;
-
-  if (!stdId || !stdName) { showSystemAlert('กรุณาเลือกชื่อ นศท. จากรายการ', 'warning'); return; }
-  if (!gender)  { showSystemAlert('ไม่พบข้อมูลประเภท นศท. กรุณาเลือกชื่อใหม่', 'danger'); return; }
-  if (!busNum)  { showSystemAlert('กรุณาเลือกรถที่ต้องการจอง', 'warning'); return; }
-  if (gender !== BUS_GENDER[parseInt(busNum)]) {
-    showSystemAlert('ประเภท นศท. ไม่ตรงกับรถที่เลือก กรุณาตรวจสอบอีกครั้ง', 'danger');
-    return;
+  // ถ้ายังไม่มีคอลัมน์ "สถานะ" ให้เพิ่มที่ตำแหน่งคอลัมน์ 8
+  if (headers.indexOf('สถานะ') === -1) {
+    sheet.getRange(1, 8).setValue('สถานะ');
+    sheet.getRange(1, 8).setFontWeight('bold').setBackground('#1a3a6e').setFontColor('white');
   }
 
-  pendingBooking = { stdId, stdName, gender, busNum };
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return; // ไม่มีข้อมูลผู้จอง
 
-  document.getElementById('confirmDetail').innerHTML = `
-    <table style="width:100%">
-      <tr><td style="color:var(--text-muted);width:120px">เลข นศท.</td><td><strong>${stdId}</strong></td></tr>
-      <tr><td style="color:var(--text-muted)">ชื่อ-สกุล</td><td><strong>${stdName}</strong></td></tr>
-      <tr><td style="color:var(--text-muted)">ประเภท</td><td>${gender}</td></tr>
-      <tr><td style="color:var(--text-muted)">รถที่จอง</td><td><strong style="color:${BUS_COLORS[busNum]}">คันที่ ${busNum} · ${BUS_LABELS[busNum]}</strong></td></tr>
-      <tr><td style="color:var(--text-muted)">ค่ารถ</td><td><strong>945 บาท</strong></td></tr>
-    </table>`;
+  // เติมสถานะ "รออนุมัติ" ให้ทุกแถวที่ยังไม่มีค่าสถานะ
+  const statusRange = sheet.getRange(2, 8, lastRow - 1, 1);
+  const values = statusRange.getValues();
+  const newValues = values.map(row => [row[0] ? row[0] : STATUS_PENDING]);
+  statusRange.setValues(newValues);
 
-  document.getElementById('confirmModal').classList.add('active');
+  return { success: true, message: `อัปเดตสถานะให้ ${lastRow - 1} แถวเรียบร้อย` };
 }
 
-async function confirmBooking() {
-  if (!pendingBooking) return;
-  if (!SCRIPT_URL) {
-    showSystemAlert('ยังไม่ได้ตั้งค่า Google Apps Script URL', 'warning');
-    closeModal(); return;
-  }
-
-  const btn = document.getElementById('btnConfirm');
-  btn.innerHTML = '<span class="spinner"></span>กำลังบันทึก...';
-  btn.disabled = true;
+// ===== WEB APP ENTRY POINT =====
+function doGet(e) {
+  const action = e.parameter.action;
+  let result;
 
   try {
-    const params = new URLSearchParams({
-      action: 'book',
-      stdId: pendingBooking.stdId,
-      stdName: pendingBooking.stdName,
-      gender: pendingBooking.gender,
-      busNum: pendingBooking.busNum
-    });
-
-    const res = await fetch(SCRIPT_URL + '?' + params);
-    const data = await res.json();
-
-    closeModal();
-
-    if (data.success) {
-      const rc = document.getElementById('resultCard');
-      document.getElementById('resultTitle').textContent = 'บันทึกการจองแล้ว ✅';
-      document.getElementById('resultDetail').innerHTML =
-        `${pendingBooking.stdName} · รถคันที่ ${pendingBooking.busNum} (${BUS_LABELS[pendingBooking.busNum]})<br>
-         ที่นั่งที่ ${data.seatNum} / ${MAX_PER_BUS} · จำนวนเงิน 945 บาท
-         <div class="pending-badge">⏳ รอการตรวจสอบ/อนุมัติ หลังจากชำระเงิน 945 บาท เท่านั้น</div>`;
-      rc.style.display = 'block';
-      rc.scrollIntoView({ behavior: 'smooth' });
-      loadBusStatus();
-    } else {
-      showSystemAlert(data.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่', 'danger');
+    switch(action) {
+      case 'status':    result = getStatus();                  break;
+      case 'book':      result = bookSeat(e.parameter);        break;
+      case 'check':     result = checkBooking(e.parameter);    break;
+      case 'passengers':result = getPassengers(e.parameter);   break;
+      case 'cancel':    result = cancelBooking(e.parameter);   break;
+      case 'approve':   result = approveBooking(e.parameter);  break;
+      case 'unapprove': result = unapproveBooking(e.parameter);break;
+      case 'setup':     setupSheets(); result = {success:true, message:'Setup complete'}; break;
+      default:          result = { success: false, message: 'Unknown action' };
     }
-  } catch(e) {
-    closeModal();
-    showSystemAlert('เกิดข้อผิดพลาดในการเชื่อมต่อ: ' + e.message, 'danger');
+  } catch(err) {
+    result = { success: false, message: err.toString() };
   }
 
-  btn.innerHTML = '✅ ยืนยันจอง';
-  btn.disabled = false;
+  return ContentService
+    .createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
-function closeModal() {
-  document.getElementById('confirmModal').classList.remove('active');
+// ===== doPost (สำหรับ CORS) =====
+function doPost(e) {
+  return doGet(e);
 }
 
-// ===== STATUS DETAIL =====
-function renderStatusDetail(data) {
-  let html = '';
+// ===== GET STATUS =====
+function getStatus() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName('Bookings');
+  if (!sheet) { setupSheets(); sheet = ss.getSheetByName('Bookings'); }
+
+  const data = sheet.getDataRange().getValues();
+  const buses = {};
+
   for (let i = 1; i <= TOTAL_BUSES; i++) {
-    const count = (data[i] && data[i].count) || 0;
-    const isFull = count >= MAX_PER_BUS;
-    const pct = Math.round((count / MAX_PER_BUS) * 100);
-    html += `
-      <div style="background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div style="display:flex;align-items:center;gap:10px">
-            <span style="background:${isFull ? '#9ca3af' : BUS_COLORS[i]};color:white;padding:4px 10px;border-radius:6px;font-size:13px;font-weight:700">คันที่ ${i}</span>
-            <span style="font-size:14px;font-weight:600">${BUS_LABELS[i]}</span>
-            <span style="font-size:12px;color:var(--text-muted)">${BUS_GENDER[i] === 'หญิง' ? '👧 หญิง' : '👦 ชาย'}</span>
-          </div>
-          <span style="font-size:13px;font-weight:700;color:${isFull ? 'var(--danger)' : 'var(--success)'}">${count}/${MAX_PER_BUS}</span>
-        </div>
-        <div style="background:#eef0f5;border-radius:6px;height:8px;overflow:hidden">
-          <div style="height:100%;border-radius:6px;background:${isFull ? '#ef4444' : pct >= 60 ? '#f59e0b' : '#22c55e'};width:${pct}%"></div>
-        </div>
-        ${isFull ? '<div style="margin-top:6px;font-size:12px;color:var(--danger);font-weight:600">🚫 เต็มแล้ว</div>' : `<div style="margin-top:6px;font-size:12px;color:var(--success)">✅ ว่างอีก ${MAX_PER_BUS - count} ที่นั่ง</div>`}
-      </div>`;
+    buses[i] = { count: 0, approvedCount: 0, pendingCount: 0, passengers: [] };
   }
-  document.getElementById('statusDetail').innerHTML = html;
+
+  for (let r = 1; r < data.length; r++) {
+    const row = data[r];
+    const busNum = parseInt(row[4]);
+    const stdId  = row[1];
+    const name   = row[2];
+    const ts     = row[6];
+    const status = row[7] || STATUS_PENDING;
+
+    if (busNum >= 1 && busNum <= TOTAL_BUSES) {
+      if (!buses[busNum]) buses[busNum] = { count: 0, approvedCount: 0, pendingCount: 0, passengers: [] };
+      buses[busNum].count++;
+      if (status === STATUS_APPROVED) buses[busNum].approvedCount++;
+      else buses[busNum].pendingCount++;
+
+      buses[busNum].passengers.push({
+        stdId, name, status,
+        timestamp: ts ? Utilities.formatDate(new Date(ts), 'Asia/Bangkok', 'dd/MM/yyyy HH:mm') : ''
+      });
+    }
+  }
+
+  return { success: true, buses };
 }
 
-// ===== ADMIN =====
-function adminLogin() {
-  const pass = document.getElementById('adminPass').value;
-  if (pass === ADMIN_PASSWORD) {
-    document.getElementById('adminPanel').style.display = 'block';
-  } else {
-    showSystemAlert('รหัสผ่านไม่ถูกต้อง', 'danger');
-  }
-}
+// ===== BOOK SEAT =====
+function bookSeat(params) {
+  const stdId   = (params.stdId   || '').trim();
+  const stdName = (params.stdName || '').trim();
+  const gender  = (params.gender  || '').trim();
+  const busNum  = parseInt(params.busNum);
 
-async function loadPassengers() {
-  const busNum = document.getElementById('adminBusSelect').value;
-  const exportRow = document.getElementById('passengerExportRow');
-  if (!busNum || !SCRIPT_URL) { exportRow.style.display = 'none'; return; }
-  const listEl = document.getElementById('passengerList');
-  listEl.innerHTML = '<div style="padding:12px;color:var(--text-muted)">กำลังโหลด...</div>';
-  exportRow.style.display = 'none';
+  if (!stdId || !stdName || !gender || !busNum) {
+    return { success: false, message: 'ข้อมูลไม่ครบถ้วน' };
+  }
+  if (busNum < 1 || busNum > TOTAL_BUSES) {
+    return { success: false, message: 'หมายเลขรถไม่ถูกต้อง' };
+  }
+  if (gender !== BUS_GENDER[busNum]) {
+    return { success: false, message: `รถคันที่ ${busNum} สำหรับ นศท.${BUS_GENDER[busNum]} เท่านั้น` };
+  }
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName('Bookings');
+  if (!sheet) { setupSheets(); sheet = ss.getSheetByName('Bookings'); }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
 
   try {
-    const res = await fetch(`${SCRIPT_URL}?action=passengers&busNum=${busNum}`);
-    const data = await res.json();
-    lastPassengerData = { busNum: parseInt(busNum), passengers: data.passengers || [] };
+    const data = sheet.getDataRange().getValues();
 
-    if (data.passengers && data.passengers.length > 0) {
-      listEl.innerHTML = `
-        <div class="passenger-list">
-          ${data.passengers.map((p, i) => `
-            <div class="passenger-item">
-              <div class="passenger-num">${i+1}</div>
-              <div>
-                <div style="font-weight:600;font-size:13px">${p.name}</div>
-                <div style="font-size:12px;color:var(--text-muted)">${p.stdId} · ${p.timestamp || ''}</div>
-                <div style="font-size:11px;color:var(--warning);font-weight:600;margin-top:2px">⏳ รอตรวจสอบ/อนุมัติการชำระเงิน</div>
-              </div>
-            </div>`).join('')}
-        </div>
-        <div style="margin-top:8px;font-size:13px;color:var(--text-muted)">รวม ${data.passengers.length} / ${MAX_PER_BUS} คน</div>`;
-      exportRow.style.display = 'block';
-    } else {
-      listEl.innerHTML = '<div style="padding:12px;color:var(--text-muted)">ยังไม่มีผู้จอง</div>';
+    for (let r = 1; r < data.length; r++) {
+      if (String(data[r][1]).trim() === stdId) {
+        return { success: false, message: `เลข นศท. ${stdId} ได้จองรถคันที่ ${data[r][4]} ไปแล้ว` };
+      }
     }
-  } catch(e) {
-    listEl.innerHTML = `<div style="padding:12px;color:var(--danger)">ข้อผิดพลาด: ${e.message}</div>`;
+
+    let seatCount = 0;
+    for (let r = 1; r < data.length; r++) {
+      if (parseInt(data[r][4]) === busNum) seatCount++;
+    }
+
+    if (seatCount >= MAX_PER_BUS) {
+      return { success: false, message: `รถคันที่ ${busNum} เต็มแล้ว (${MAX_PER_BUS}/${MAX_PER_BUS})` };
+    }
+
+    const seatNum   = seatCount + 1;
+    const newRow    = data.length;
+    const timestamp = new Date();
+
+    sheet.appendRow([
+      newRow, stdId, stdName, gender, busNum, seatNum, timestamp, STATUS_PENDING
+    ]);
+
+    sheet.getRange(sheet.getLastRow(), 7).setNumberFormat('dd/MM/yyyy HH:mm:ss');
+
+    return { success: true, seatNum, busNum, status: STATUS_PENDING, message: 'จองสำเร็จ รอการตรวจสอบ/อนุมัติ' };
+
+  } finally {
+    lock.releaseLock();
   }
 }
 
-// ===== EXPORT / PRINT PASSENGER LIST =====
-let lastPassengerData = null;
+// ===== CHECK BOOKING =====
+function checkBooking(params) {
+  const stdId = (params.stdId || '').trim();
+  if (!stdId) return { found: false };
 
-function buildPassengerTableHTML(busNum, passengers, forPrint) {
-  const label = BUS_LABELS[busNum];
-  const gender = BUS_GENDER[busNum];
-  const color = BUS_COLORS[busNum];
-  const rows = passengers.map((p, i) => `
-    <tr>
-      <td style="text-align:center">${i+1}</td>
-      <td>${p.stdId}</td>
-      <td>${p.name}</td>
-      <td style="text-align:center">945</td>
-      <td style="text-align:center">☐</td>
-      <td></td>
-    </tr>`).join('');
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Bookings');
+  if (!sheet) return { found: false };
 
-  return `
-    <div style="font-family:'Sarabun','Segoe UI',sans-serif; padding:${forPrint ? '24px' : '0'};">
-      <div style="text-align:center; margin-bottom:6px;">
-        <div style="font-size:16px; font-weight:700;">ระบบจองรถโดยสาร นศท. ชั้นปีที่ 2</div>
-        <div style="font-size:13px; color:#555;">โรงเรียนมัธยมวัดหนองแขม · ปีการศึกษา 2569</div>
-      </div>
-      <div style="text-align:center; margin:10px 0 16px;">
-        <span style="background:${color}; color:white; padding:6px 16px; border-radius:6px; font-size:15px; font-weight:700;">
-          รถคันที่ ${busNum} · ${label} · ${gender === 'หญิง' ? 'นศท.หญิง' : 'นศท.ชาย'}
-        </span>
-      </div>
-      <table style="width:100%; border-collapse:collapse; font-size:13px;">
-        <thead>
-          <tr style="background:#eef0f5;">
-            <th style="border:1px solid #999; padding:6px;">ที่</th>
-            <th style="border:1px solid #999; padding:6px;">เลข นศท.</th>
-            <th style="border:1px solid #999; padding:6px;">ชื่อ-สกุล</th>
-            <th style="border:1px solid #999; padding:6px;">ค่ารถ (บาท)</th>
-            <th style="border:1px solid #999; padding:6px;">ชำระแล้ว</th>
-            <th style="border:1px solid #999; padding:6px;">ลงชื่อขึ้นรถ</th>
-          </tr>
-        </thead>
-        <tbody>${rows || `<tr><td colspan="6" style="text-align:center; padding:14px; border:1px solid #999;">ยังไม่มีผู้จอง</td></tr>`}</tbody>
-      </table>
-      <div style="margin-top:10px; font-size:13px;">รวมผู้จอง: <strong>${passengers.length}</strong> / ${MAX_PER_BUS} คน</div>
-      <div style="margin-top:30px; font-size:13px; display:flex; justify-content:space-between;">
-        <div>ผู้ตรวจสอบ/รับเงิน ........................................</div>
-        <div>วันที่ ........../........../..........</div>
-      </div>
-    </div>`;
-}
-
-function openPrintWindow(html) {
-  const w = window.open('', '_blank');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>พิมพ์รายชื่อ</title>
-    <style>
-      @page { size: A4; margin: 14mm; }
-      body { margin:0; }
-      @media print { button { display:none; } }
-    </style></head><body>${html}
-    <div style="text-align:center; margin-top:20px;">
-      <button onclick="window.print()" style="padding:10px 24px; font-size:14px; cursor:pointer;">🖨️ พิมพ์</button>
-    </div>
-    </body></html>`);
-  w.document.close();
-}
-
-function printPassengerList() {
-  if (!lastPassengerData) return;
-  const html = buildPassengerTableHTML(lastPassengerData.busNum, lastPassengerData.passengers, true);
-  openPrintWindow(html);
-}
-
-function exportPassengerCSV() {
-  if (!lastPassengerData) return;
-  const { busNum, passengers } = lastPassengerData;
-  let csv = '\uFEFF' + ['ที่', 'เลข นศท.', 'ชื่อ-สกุล', 'รถคันที่', 'ประเภท', 'ค่ารถ', 'วันเวลาจอง'].join(',') + '\n';
-  passengers.forEach((p, i) => {
-    csv += [i+1, p.stdId, `"${p.name}"`, busNum, BUS_GENDER[busNum], 945, `"${p.timestamp || ''}"`].join(',') + '\n';
-  });
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `รายชื่อจอง_คันที่${busNum}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-async function printAllBuses() {
-  if (!SCRIPT_URL) { showSystemAlert('ยังไม่ได้ตั้งค่าระบบ', 'warning'); return; }
-  let allHtml = '';
-  for (let i = 1; i <= TOTAL_BUSES; i++) {
-    try {
-      const res = await fetch(`${SCRIPT_URL}?action=passengers&busNum=${i}`);
-      const data = await res.json();
-      allHtml += buildPassengerTableHTML(i, data.passengers || [], true);
-      if (i < TOTAL_BUSES) allHtml += '<div style="page-break-after:always;"></div>';
-    } catch(e) {
-      allHtml += `<div style="padding:14px;color:red;">รถคันที่ ${i}: โหลดข้อมูลไม่สำเร็จ (${e.message})</div>`;
+  const data = sheet.getDataRange().getValues();
+  for (let r = 1; r < data.length; r++) {
+    if (String(data[r][1]).trim() === stdId) {
+      return {
+        found: true,
+        stdId:   data[r][1],
+        name:    data[r][2],
+        busNum:  data[r][4],
+        seatNum: data[r][5],
+        status:  data[r][7] || STATUS_PENDING,
+        timestamp: data[r][6] ? Utilities.formatDate(new Date(data[r][6]), 'Asia/Bangkok', 'dd/MM/yyyy HH:mm') : ''
+      };
     }
   }
-  openPrintWindow(allHtml);
+  return { found: false };
 }
 
-async function cancelBooking() {
-  const id = document.getElementById('cancelId').value.trim();
-  if (!id) { showSystemAlert('กรุณากรอกเลข นศท. ที่ต้องการยกเลิก', 'warning'); return; }
-  if (!confirm(`ยืนยันยกเลิกการจองของ นศท. เลข ${id} ?`)) return;
+// ===== GET PASSENGERS (Admin) =====
+function getPassengers(params) {
+  const busNum = parseInt(params.busNum);
 
-  try {
-    const res = await fetch(`${SCRIPT_URL}?action=cancel&stdId=${id}&adminPass=${ADMIN_PASSWORD}`);
-    const data = await res.json();
-    if (data.success) {
-      showSystemAlert('ยกเลิกการจองสำเร็จ', 'success');
-      loadBusStatus();
-    } else {
-      showSystemAlert(data.message || 'เกิดข้อผิดพลาด', 'danger');
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Bookings');
+  if (!sheet) return { passengers: [] };
+
+  const data = sheet.getDataRange().getValues();
+  const passengers = [];
+
+  for (let r = 1; r < data.length; r++) {
+    if (parseInt(data[r][4]) === busNum) {
+      passengers.push({
+        seatNum:   data[r][5],
+        stdId:     data[r][1],
+        name:      data[r][2],
+        status:    data[r][7] || STATUS_PENDING,
+        timestamp: data[r][6] ? Utilities.formatDate(new Date(data[r][6]), 'Asia/Bangkok', 'dd/MM/yyyy HH:mm') : ''
+      });
     }
-  } catch(e) {
-    showSystemAlert('เชื่อมต่อไม่ได้: ' + e.message, 'danger');
   }
+
+  passengers.sort((a, b) => a.seatNum - b.seatNum);
+  return { passengers };
 }
 
-// ===== TABS =====
-function switchTab(name) {
-  document.querySelectorAll('.tab').forEach((t, i) => {
-    t.classList.toggle('active', ['book','status','admin'][i] === name);
-  });
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  document.getElementById('tab-' + name).classList.add('active');
-  if (name === 'status') { renderStatusDetail(busData); }
+// ===== APPROVE BOOKING (Admin only - หลังตรวจสอบว่าชำระเงินแล้ว) =====
+function approveBooking(params) {
+  if (params.adminPass !== ADMIN_PASSWORD) {
+    return { success: false, message: 'รหัสผ่านผู้ดูแลไม่ถูกต้อง' };
+  }
+
+  const stdId = (params.stdId || '').trim();
+  if (!stdId) return { success: false, message: 'ไม่พบเลข นศท.' };
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Bookings');
+  if (!sheet) return { success: false, message: 'ไม่พบ Sheet' };
+
+  const data = sheet.getDataRange().getValues();
+  for (let r = 1; r < data.length; r++) {
+    if (String(data[r][1]).trim() === stdId) {
+      sheet.getRange(r + 1, 8).setValue(STATUS_APPROVED);
+      return { success: true, message: `อนุมัติการจองของ ${data[r][2]} แล้ว`, status: STATUS_APPROVED };
+    }
+  }
+  return { success: false, message: 'ไม่พบเลข นศท. นี้ในระบบ' };
 }
 
-// ===== SYSTEM ALERT =====
-function showSystemAlert(msg, type) {
-  const el = document.getElementById('systemAlert');
-  const icons = { warning:'⚠️', danger:'❌', success:'✅', info:'ℹ️' };
-  el.className = `alert alert-${type}`;
-  el.style.display = 'flex';
-  el.innerHTML = `<span class="alert-icon">${icons[type]}</span><div>${msg}</div>`;
-  setTimeout(() => el.style.display = 'none', 5000);
-  el.scrollIntoView({ behavior:'smooth', block:'nearest' });
+// ===== UNAPPROVE / ย้อนกลับเป็นรออนุมัติ (กรณีกดอนุมัติผิด) =====
+function unapproveBooking(params) {
+  if (params.adminPass !== ADMIN_PASSWORD) {
+    return { success: false, message: 'รหัสผ่านผู้ดูแลไม่ถูกต้อง' };
+  }
+
+  const stdId = (params.stdId || '').trim();
+  if (!stdId) return { success: false, message: 'ไม่พบเลข นศท.' };
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Bookings');
+  if (!sheet) return { success: false, message: 'ไม่พบ Sheet' };
+
+  const data = sheet.getDataRange().getValues();
+  for (let r = 1; r < data.length; r++) {
+    if (String(data[r][1]).trim() === stdId) {
+      sheet.getRange(r + 1, 8).setValue(STATUS_PENDING);
+      return { success: true, message: `ย้อนสถานะของ ${data[r][2]} เป็นรออนุมัติแล้ว`, status: STATUS_PENDING };
+    }
+  }
+  return { success: false, message: 'ไม่พบเลข นศท. นี้ในระบบ' };
 }
 
-// Close modal on overlay click
-document.getElementById('confirmModal').addEventListener('click', function(e) {
-  if (e.target === this) closeModal();
-});
+// ===== CANCEL BOOKING (Admin) =====
+function cancelBooking(params) {
+  if (params.adminPass !== ADMIN_PASSWORD) {
+    return { success: false, message: 'รหัสผ่านผู้ดูแลไม่ถูกต้อง' };
+  }
 
-// Auto-refresh every 30 seconds
-setInterval(() => { if (SCRIPT_URL) loadBusStatus(); }, 30000);
-</script>
+  const stdId = (params.stdId || '').trim();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Bookings');
+  if (!sheet) return { success: false, message: 'ไม่พบ Sheet' };
 
-</body>
-</html>
+  const data = sheet.getDataRange().getValues();
+  for (let r = 1; r < data.length; r++) {
+    if (String(data[r][1]).trim() === stdId) {
+      sheet.deleteRow(r + 1);
+      return { success: true, message: `ยกเลิกการจองของ ${data[r][2]} สำเร็จ` };
+    }
+  }
+  return { success: false, message: 'ไม่พบเลข นศท. นี้ในระบบ' };
+}
